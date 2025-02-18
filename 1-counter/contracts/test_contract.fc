@@ -1,0 +1,38 @@
+#include "imports/stdlib.fc";
+
+int load_data() inline {
+    slice data = get_data().begin_parse();
+
+    return data~load_uint(64);
+}
+
+() save_data(int value) impure {
+    set_data(
+        begin_cell()
+        .store_uint(value, 64)
+        .end_cell()
+    );
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if(in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cellSlice = in_msg_full.begin_parse();
+    int flags = cellSlice~load_uint(4);
+
+    if(flags & 1) {
+        return ();
+    }
+
+    int value = in_msg_body~load_uint(64); ;; parametredeki değer
+    int storage_value = load_data(); ;; storage'daki değer
+
+    storage_value += value;
+    save_data(storage_value);
+}
+
+int get_current_value() method_id {
+    return load_data();
+}
