@@ -4,7 +4,6 @@ import { compile, NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
     try {
-        // Kontratı oluştur
         const transferContract = provider.open(
             TransferContract.createFromConfig({
                 value: 0,

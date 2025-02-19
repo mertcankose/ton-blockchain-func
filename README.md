@@ -8,7 +8,7 @@
    ![TON Logo](https://github.com/mertcankose/ton-blockchain-func/blob/main/assets/counter.png)
 
 2. Payable Counter Contract
-   Users must pay 0.1 TON for each increment operation.
+   Users must pay 0.01 TON for each increment operation.
    The contract owner can withdraw the contract balance using the withdraw function.
 
    ![TON Transfer](https://github.com/mertcankose/ton-blockchain-func/blob/main/assets/transfer.png)
