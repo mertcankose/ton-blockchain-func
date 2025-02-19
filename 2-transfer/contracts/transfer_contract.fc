@@ -1,0 +1,161 @@
+#include "imports/stdlib.fc";
+
+;; Operation codes
+const int op::increment = 1;
+const int op::withdraw = 2;
+const int op::transfer_ownership = 3;
+const int op::init = 0;
+
+;; Error codes
+const int error::unauthorized = 100;
+const int error::insufficient_fee = 101;
+
+;; Fee amount (0.01 TON = 1000000000)
+const int INCREMENT_FEE = 1000000000;
+
+;; Storage TL-B
+;; storage#_ value:uint64 owner:MsgAddress users:(HashmapE 256 uint64) = Storage;
+
+int equal_slices(slice a, slice b) asm "SDEQ";
+
+(int, slice, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    if (ds.slice_empty?()) {
+        return (
+            0,                          ;; initial counter value
+            my_address(),               ;; return empty address for owner initially
+            new_dict()                  ;; empty dictionary for users
+        );
+    }
+    return (
+        ds~load_uint(64),              ;; counter value
+        ds~load_msg_addr(),            ;; owner address
+        ds~load_dict()                 ;; user map
+    );
+}
+
+() save_data(int value, slice owner_address, cell users) impure inline {
+    set_data(
+        begin_cell()
+        .store_uint(value, 64)
+        .store_slice(owner_address)
+        .store_dict(users)
+        .end_cell()
+    );
+}
+
+(cell) update_user_stats(cell users, slice user_address) {
+    int key = slice_hash(user_address);
+    (slice value_slice, int found?) = users.udict_get?(256, key);
+    int value = 0;
+    if (found?) {
+        value = value_slice~load_uint(64);
+    }
+    value += 1;
+    
+    users~udict_set(
+        256, 
+        key, 
+        begin_cell()
+        .store_uint(value, 64)
+        .end_cell()
+        .begin_parse()
+    );
+    return users;
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if(in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+
+    if(flags & 1) {
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(4);
+    
+    ;; Mevcut değerleri yükle
+    (int current_value, slice owner_address, cell users) = load_data();
+
+    ;; İlk deploy sırasında owner'ı ayarla
+    if (op == op::init) {
+        ;; Owner zaten ayarlanmışsa hata ver
+        throw_if(error::unauthorized, ~ equal_slices(owner_address, null()));
+        save_data(current_value, sender_address, users);
+        return ();
+    }
+
+    ;; Owner null ise ve init op değilse işlemi reddet
+    throw_if(error::unauthorized, equal_slices(owner_address, null()));
+
+    if(op == op::increment) {
+        int value = in_msg_body~load_uint(64);
+        ;; Fee kontrolü
+        throw_unless(error::insufficient_fee, msg_value >= INCREMENT_FEE);
+        
+        ;; Counter'ı güncelle
+        current_value += value;
+        
+        ;; Kullanıcı istatistiklerini güncelle
+        users = update_user_stats(users, sender_address);
+        
+        save_data(current_value, owner_address, users);
+        return ();
+    }
+
+    if(op == op::withdraw) {
+        ;; Owner kontrolü
+        throw_unless(error::unauthorized, equal_slices(sender_address, owner_address));
+        
+        raw_reserve(10000000, 0);
+        
+        var msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(owner_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+            
+        send_raw_message(msg, 128);
+        return ();
+    }
+
+    if(op == op::transfer_ownership) {
+        ;; Owner kontrolü
+        throw_unless(error::unauthorized, equal_slices(sender_address, owner_address));
+        
+        slice new_owner = in_msg_body~load_msg_addr();
+        ;; Owner'ı güncelle ve diğer verileri koru
+        save_data(current_value, new_owner, users);
+        return ();
+    }
+}
+
+;; Getter metodları
+(int, slice, cell) get_contract_data() method_id {
+    slice ds = get_data().begin_parse();
+    if (ds.slice_empty?()) {
+        return (0, my_address(), new_dict());
+    }
+    return (
+        ds~load_uint(64),
+        ds~load_msg_addr(),
+        ds~load_dict()
+    );
+}
+
+int get_user_stats(slice user_address) method_id {
+    (_, _, cell users) = load_data();
+    int key = slice_hash(user_address);
+    (slice value_slice, int found?) = users.udict_get?(256, key);
+    int value = 0;
+    if (found?) {
+        value = value_slice~load_uint(64);
+    }
+    return value;
+} 
