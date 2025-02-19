@@ -1,3 +1,4 @@
+import "@twa-dev/sdk";
 import "./App.css";
 import { WalletInfo } from "@tonconnect/ui";
 import { useEffect, useState } from "react";
