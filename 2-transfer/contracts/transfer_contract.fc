@@ -3,159 +3,126 @@
 ;; Operation codes
 const int op::increment = 1;
 const int op::withdraw = 2;
-const int op::transfer_ownership = 3;
-const int op::init = 0;
+const int op::change_owner = 3;
 
 ;; Error codes
-const int error::unauthorized = 100;
 const int error::insufficient_fee = 101;
+const int error::not_authorized = 102;
 
-;; Fee amount (0.01 TON = 1000000000)
-const int INCREMENT_FEE = 1000000000;
+;; Fee amount (0.01 TON = 10000000000)
+const int INCREMENT_FEE = 10000000000;
 
-;; Storage TL-B
-;; storage#_ value:uint64 owner:MsgAddress users:(HashmapE 256 uint64) = Storage;
+int equal_slice_bits(slice a, slice b) asm "SDEQ";
 
-int equal_slices(slice a, slice b) asm "SDEQ";
+;; Storage format
+;; strict value:(## 64) owner_address:MsgAddressInt = Storage;
 
-(int, slice, cell) load_data() inline {
+(int, slice) load_data() inline {
     slice ds = get_data().begin_parse();
-    if (ds.slice_empty?()) {
-        return (
-            0,                          ;; initial counter value
-            my_address(),               ;; return empty address for owner initially
-            new_dict()                  ;; empty dictionary for users
-        );
+    if (ds.slice_empty?()) {  ;; İlk deploy için kontrol
+        return (0, null());   ;; Varsayılan değerler
     }
     return (
-        ds~load_uint(64),              ;; counter value
-        ds~load_msg_addr(),            ;; owner address
-        ds~load_dict()                 ;; user map
+        ds~load_uint(64),      ;; value
+        ds~load_msg_addr()     ;; owner_address
     );
 }
 
-() save_data(int value, slice owner_address, cell users) impure inline {
+() save_data(int value, slice owner_address) impure inline {
     set_data(
         begin_cell()
-        .store_uint(value, 64)
-        .store_slice(owner_address)
-        .store_dict(users)
+            .store_uint(value, 64)
+            .store_slice(owner_address)
         .end_cell()
     );
 }
 
-(cell) update_user_stats(cell users, slice user_address) {
-    int key = slice_hash(user_address);
-    (slice value_slice, int found?) = users.udict_get?(256, key);
-    int value = 0;
-    if (found?) {
-        value = value_slice~load_uint(64);
-    }
-    value += 1;
-    
-    users~udict_set(
-        256, 
-        key, 
-        begin_cell()
-        .store_uint(value, 64)
-        .end_cell()
-        .begin_parse()
-    );
-    return users;
+() check_owner(slice sender_address, slice owner_address) impure inline {
+    throw_unless(error::not_authorized, equal_slice_bits(sender_address, owner_address));
 }
 
+;; İç mesajları işle
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
-    if(in_msg_body.slice_empty?()) {
-        return ();
-    }
-
+    ;; Parse sender address
     slice cs = in_msg_full.begin_parse();
     int flags = cs~load_uint(4);
     slice sender_address = cs~load_msg_addr();
+    
+    ;; Bounce check
+    if (flags & 1) { return (); }
 
-    if(flags & 1) {
+    ;; Empty message handling - Initial deployment
+    if (in_msg_body.slice_empty?()) {
+        save_data(0, sender_address);
         return ();
     }
 
+    ;; Load contract data
+    (int value, slice owner_address) = load_data();
+    
+    ;; Parse op
     int op = in_msg_body~load_uint(4);
     
-    ;; Mevcut değerleri yükle
-    (int current_value, slice owner_address, cell users) = load_data();
+    ;; Increment operation - anyone can do
+    if (op == op::increment) {
+        int inc_value = in_msg_body~load_uint(64);
+        int old_value = value;  ;; eski değeri sakla
+        value += inc_value;
 
-    ;; İlk deploy sırasında owner'ı ayarla
-    if (op == op::init) {
-        ;; Owner zaten ayarlanmışsa hata ver
-        throw_if(error::unauthorized, ~ equal_slices(owner_address, null()));
-        save_data(current_value, sender_address, users);
+        ~dump(op);           ;; operation code
+        ~dump(inc_value);    ;; artış miktarı
+        ~dump(old_value);    ;; eski değer
+        ~dump(value);        ;; yeni değer
+
+        save_data(value, owner_address);
         return ();
     }
 
-    ;; Owner null ise ve init op değilse işlemi reddet
-    throw_if(error::unauthorized, equal_slices(owner_address, null()));
-
-    if(op == op::increment) {
-        int value = in_msg_body~load_uint(64);
-        ;; Fee kontrolü
-        throw_unless(error::insufficient_fee, msg_value >= INCREMENT_FEE);
+    ;; Withdraw operation - only owner
+    if (op == op::withdraw) {
+        ;; Owner check
+        check_owner(sender_address, owner_address);
         
-        ;; Counter'ı güncelle
-        current_value += value;
-        
-        ;; Kullanıcı istatistiklerini güncelle
-        users = update_user_stats(users, sender_address);
-        
-        save_data(current_value, owner_address, users);
-        return ();
-    }
-
-    if(op == op::withdraw) {
-        ;; Owner kontrolü
-        throw_unless(error::unauthorized, equal_slices(sender_address, owner_address));
-        
+        ;; Reserve minimum balance
         raw_reserve(10000000, 0);
         
+        ;; Send remaining balance
         var msg = begin_cell()
             .store_uint(0x18, 6)
-            .store_slice(owner_address)
+            .store_slice(sender_address)
             .store_coins(0)
             .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(0, 32)
             .end_cell();
             
-        send_raw_message(msg, 128);
+        send_raw_message(msg, 128 + 16);
         return ();
     }
 
-    if(op == op::transfer_ownership) {
-        ;; Owner kontrolü
-        throw_unless(error::unauthorized, equal_slices(sender_address, owner_address));
-        
+    ;; Change owner operation - only owner
+    if (op == op::change_owner) {
+        check_owner(sender_address, owner_address);
         slice new_owner = in_msg_body~load_msg_addr();
-        ;; Owner'ı güncelle ve diğer verileri koru
-        save_data(current_value, new_owner, users);
+        save_data(value, new_owner);
         return ();
     }
+
+    ;; If no operation matched
+    throw(0xffff);
 }
 
-;; Getter metodları
-(int, slice, cell) get_contract_data() method_id {
-    slice ds = get_data().begin_parse();
-    if (ds.slice_empty?()) {
-        return (0, my_address(), new_dict());
-    }
-    return (
-        ds~load_uint(64),
-        ds~load_msg_addr(),
-        ds~load_dict()
-    );
+;; Getter methods
+(int, slice) get_contract_data() method_id {
+    (int value, slice owner) = load_data();
+    return (value, owner);
 }
 
-int get_user_stats(slice user_address) method_id {
-    (_, _, cell users) = load_data();
-    int key = slice_hash(user_address);
-    (slice value_slice, int found?) = users.udict_get?(256, key);
-    int value = 0;
-    if (found?) {
-        value = value_slice~load_uint(64);
-    }
+int get_value() method_id {
+    (int value, _) = load_data();
     return value;
-} 
+}
+
+slice get_owner() method_id {
+    (_, slice owner) = load_data();
+    return owner;
+}

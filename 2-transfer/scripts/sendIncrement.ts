@@ -1,26 +1,29 @@
-import { Address, toNano } from "@ton/ton";
+import { Address } from "@ton/ton";
 import { TransferContract } from "../wrappers/TransferContract";
 import { NetworkProvider } from '@ton/blueprint';
 
-export async function run(provider: NetworkProvider) {
-  // open Counter instance by address
-  const transferContractAddress = Address.parse("EQCL9cdMDf_PnW0oWqpCTNnNOJkPDp0da6eI2p7ubglp8D7l");
+export async function run(provider: NetworkProvider, incrementValue: number = 1) {
+  const transferContractAddress = Address.parse("EQCwQzBoOPf88C6TdZx_cZVuxotGqwHKPagXljaF7KAWwztu");
   const transferContract = provider.open(TransferContract.createFromAddress(transferContractAddress));
 
   try {
-    // send the increment transaction with required fee
-    await transferContract.sendIncrement(provider.sender(), 1, toNano('0.01'));
+    // Increment işlemini gönder (0.01 TON fee ile)
+    await transferContract.sendIncrement(
+      provider.sender(), 
+      2
+    );
 
-    // wait until transaction is confirmed
-    console.log("waiting for transaction to confirm...");
+    console.log("Waiting for transaction to confirm...");
     await provider.waitForDeploy(transferContract.address);
-    
-    // Get updated contract data
-    const contractData = await transferContract.getContractData();
     console.log("Transaction confirmed!");
-    console.log("New contract value:", contractData.value);
+
+    return {
+      success: true,
+      incrementAmount: incrementValue
+    };
+
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error during increment:", error);
+    throw error;
   }
 }
-

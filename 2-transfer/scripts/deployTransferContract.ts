@@ -3,13 +3,45 @@ import { TransferContract } from '../wrappers/TransferContract';
 import { compile, NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
-    const transferContract = provider.open(TransferContract.createFromConfig({
-        value: 0,
-    }, await compile('TransferContract')));
+    try {
+        // Kontratı oluştur
+        const transferContract = provider.open(
+            TransferContract.createFromConfig({
+                value: 0,
+                owner: provider.sender().address!
+            }, 
+            await compile('TransferContract'))
+        );
 
-    await transferContract.sendDeploy(provider.sender(), toNano('0.01'));
+        // Deploy için gereken minimum miktar (0.1 TON önerilen)
+        const DEPLOY_AMOUNT = toNano('0.1');
 
-    await provider.waitForDeploy(transferContract.address);
+        console.log('Deploying contract...');
+        console.log('Contract address:', transferContract.address.toString());
 
-    // run methods on `transferContract`
+        // Kontratı deploy et
+        await transferContract.sendDeploy(provider.sender(), DEPLOY_AMOUNT);
+
+        // Deploy'un tamamlanmasını bekle
+        console.log('Waiting for deploy transaction...');
+        await provider.waitForDeploy(transferContract.address);
+
+        // Deploy sonrası kontrat verilerini kontrol et
+        const contractData = await transferContract.getContractData();
+        
+        console.log('Contract deployed successfully!');
+        console.log('Initial value:', contractData.value);
+        console.log('Contract owner:', contractData.owner.toString());
+
+        return {
+            success: true,
+            address: transferContract.address.toString(),
+            owner: contractData.owner.toString(),
+            initialValue: contractData.value
+        };
+
+    } catch (error) {
+        console.error('Error deploying contract:', error);
+        throw error;
+    }
 }

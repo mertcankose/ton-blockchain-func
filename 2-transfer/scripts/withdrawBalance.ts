@@ -1,19 +1,31 @@
-
 import { Address, toNano } from "@ton/ton";
 import { TransferContract } from "../wrappers/TransferContract";
 import { NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
-  // open Counter instance by address
-  const transferContractAddress = Address.parse("EQCL9cdMDf_PnW0oWqpCTNnNOJkPDp0da6eI2p7ubglp8D7l");
+  const transferContractAddress = Address.parse("EQCwQzBoOPf88C6TdZx_cZVuxotGqwHKPagXljaF7KAWwztu");
   const transferContract = provider.open(TransferContract.createFromAddress(transferContractAddress));
 
-  // send the increment transaction
-  await transferContract.sendWithdraw(provider.sender(), toNano('0.001'));
+  try {
+    // Kontrat verilerini kontrol et
+    const contractData = await transferContract.getContractData();
+    console.log("Current contract owner:", contractData.owner.toString());
 
-  // wait until transaction is confirmed
-  console.log("waiting for transaction to confirm...");
-  await provider.waitForDeploy(transferContract.address);
-  console.log("transaction confirmed!");
+    // Withdraw işlemini gönder
+    await transferContract.sendWithdraw(provider.sender());
+
+    // İşlemin onaylanmasını bekle
+    console.log("Waiting for withdraw transaction to confirm...");
+    await provider.waitForDeploy(transferContract.address);
+    console.log("Withdraw transaction confirmed!");
+
+    return {
+      success: true,
+      owner: contractData.owner.toString()
+    };
+
+  } catch (error) {
+    console.error("Error during withdraw:", error);
+    throw error;
+  }
 }
-
