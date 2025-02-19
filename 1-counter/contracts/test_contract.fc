@@ -6,7 +6,7 @@ int load_data() inline {
     return data~load_uint(64);
 }
 
-() save_data(int value) impure {
+() save_data(int value) impure inline {
     set_data(
         begin_cell()
         .store_uint(value, 64)
@@ -22,6 +22,7 @@ int load_data() inline {
     slice cellSlice = in_msg_full.begin_parse();
     int flags = cellSlice~load_uint(4);
 
+    ;; bounce mesajı ise işlemi bitir (1)
     if(flags & 1) {
         return ();
     }
