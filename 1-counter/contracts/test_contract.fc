@@ -15,6 +15,8 @@ int load_data() inline {
 }
 
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ~dump(msg_value); 
+    ~dump(in_msg_body);
     if(in_msg_body.slice_empty?()) {
         return ();
     }
@@ -31,6 +33,7 @@ int load_data() inline {
     int storage_value = load_data(); ;; storage'daki değer
 
     storage_value += value;
+    ~strdump("increment received");
     save_data(storage_value);
 }
 

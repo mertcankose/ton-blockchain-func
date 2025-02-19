@@ -5,7 +5,7 @@ import { NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
   // open Counter instance by address
-  const counterAddress = Address.parse("EQDOz4DsjrCmR4tE12LSVX44jeCXnytQ6SL4cDb-jS-xslch");
+  const counterAddress = Address.parse("EQBWmdMDdsWt2dlzCnkHKriljlBaa0T6ISEAjoKpyZ1OluNy");
   const counter = provider.open(TestContract.createFromAddress(counterAddress));
 
   // send the increment transaction
