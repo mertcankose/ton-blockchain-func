@@ -1,4 +1,5 @@
 #include "imports/stdlib.fc";
+#include "imports/params.fc";
 
 ;; Operation codes
 const int op::increment = 1;
@@ -152,6 +153,7 @@ int equal_slice_bits(slice a, slice b) asm "SDEQ";
     if (op == op::change_owner) {
         check_owner(sender_address, owner_address);
         slice new_owner = in_msg_body~load_msg_addr();
+        force_chain(new_owner);
         save_data(value, new_owner, jetton_balance);
         return ();
     }
