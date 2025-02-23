@@ -52,7 +52,7 @@ export function useCounterContract() {
       address: counterContract?.address.toString(),
       sendIncrement: () => {
         return counterContract?.sendIncreaseValue(sender, {
-          value: BigInt(0.05 * 1000000000),
+          value: BigInt(0.05 * 1000000000), // 9 decimal
           increaseBy: 1,
         });
       },

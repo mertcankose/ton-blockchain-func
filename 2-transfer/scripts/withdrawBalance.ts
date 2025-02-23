@@ -3,7 +3,7 @@ import { TransferContract } from "../wrappers/TransferContract";
 import { NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
-  const transferContractAddress = Address.parse("EQCwQzBoOPf88C6TdZx_cZVuxotGqwHKPagXljaF7KAWwztu");
+  const transferContractAddress = Address.parse("EQDH9xFK9PEWo9oAewycehyUpOZkVKVPgo3agWJ0kb5_e28T");
   const transferContract = provider.open(TransferContract.createFromAddress(transferContractAddress));
 
   try {

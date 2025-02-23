@@ -34,14 +34,10 @@ export class TestContract implements Contract {
         return result.stack.readNumber();
     }
 
-    async sendIncreaseValue(
-        provider: ContractProvider,
-        via: Sender,
-        params: {
-            value: bigint; // TON miktarı
-            increaseBy: number; // Storage'a eklenecek değer
-        }
-    ) {
+    async sendIncreaseValue(provider: ContractProvider, via: Sender, params: {
+        value: bigint; // TON miktarı
+        increaseBy: number; // Storage'a eklenecek değer
+    }) {
         await provider.internal(via, {
             value: params.value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,

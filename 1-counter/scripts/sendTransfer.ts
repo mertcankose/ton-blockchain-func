@@ -10,7 +10,7 @@ export async function run(provider: NetworkProvider) {
     to: Address.parse("EQA4V9tF4lY2S_J-sEQR7aUj9IwW-Ou2vJQlCn--2DLOLR5e"),
     value: toNano('0.05'),
     body: beginCell().storeInt(1, 32).endCell(),
-    bounce: false
+    bounce: false // transfer her durumda gerçekleştirilecek. geri dönüş olmayacak.
   });
 }
 

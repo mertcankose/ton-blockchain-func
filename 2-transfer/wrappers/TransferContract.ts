@@ -1,18 +1,21 @@
-import { Address, beginCell, Cell, Contract, contractAddress, ContractProvider, Sender, SendMode, toNano } from '@ton/core';
+import { Address, beginCell, Cell, Contract,internal, contractAddress, ContractProvider, Sender, SendMode, toNano, storeMessageRelaxed } from '@ton/core';
 
 export type TransferContractConfig = {
     value: number;
     owner: Address;
+    jettonBalance: bigint;
 };
 
 export function transferContractConfigToCell(config: TransferContractConfig): Cell {
     return beginCell()
         .storeUint(config.value, 64)
         .storeAddress(config.owner)
+        .storeUint(config.jettonBalance, 64)
         .endCell();
 }
 
 export class TransferContract implements Contract {
+    static JETTON_MASTER_ADDRESS = Address.parse("EQDH9xFK9PEWo9oAewycehyUpOZkVKVPgo3agWJ0kb5_e28T");
     constructor(
         readonly address: Address,
         readonly init?: { code: Cell; data: Cell },
@@ -36,19 +39,21 @@ export class TransferContract implements Contract {
         });
     }
 
-    // Get contract data (value, owner address)
+    // Get contract data (value, owner address, jetton balance)
     async getContractData(provider: ContractProvider) {
         try {
             const { stack } = await provider.get('get_contract_data', []);
             return {
                 value: stack.readNumber(),
                 owner: stack.readAddress(),
+                jettonBalance: stack.readBigNumber(),
             };
         } catch (error) {
             console.error('Error reading contract data:', error);
             return {
                 value: 0,
-                owner: Address.parse("EQA...") // Default address
+                owner: Address.parse("EQA"), // Default address
+                jettonBalance: BigInt(0),
             };
         }
     }
@@ -65,6 +70,11 @@ export class TransferContract implements Contract {
         return stack.readAddress();
     }
 
+    async getJettonBalance(provider: ContractProvider) {
+        const { stack } = await provider.get('get_jetton_balance', []);
+        return stack.readBigNumber();
+    }
+
     // Increment the counter (anyone can call)
     async sendIncrement(provider: ContractProvider, via: Sender, value: number) {
         const INCREMENT_FEE = toNano('0.01');
@@ -75,9 +85,45 @@ export class TransferContract implements Contract {
             value: INCREMENT_FEE,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
-                .storeUint(1, 4)
+                .storeUint(1, 32)
                 .storeUint(value, 64)
                 .endCell(),
+        });
+    }
+
+    async sendIncrementWithJetton(
+        provider: ContractProvider, 
+        via: Sender, 
+        amount: bigint,
+        jettonWalletAddress: Address
+    ) {
+        const contractAddress = Address.parse("EQDH9xFK9PEWo9oAewycehyUpOZkVKVPgo3agWJ0kb5_e28T")
+        console.log('Contract address:', contractAddress.toString());
+        console.log('Jetton wallet address:', jettonWalletAddress.toString());
+        console.log('Amount:', amount.toString());
+
+        const messageBody = beginCell()
+            .storeUint(0x0f8a7ea5, 32)   // jetton transfer opcode
+            .storeUint(0, 64)           // query id
+            .storeCoins(amount)         // jetton amount
+            .storeAddress(contractAddress) // destination address
+            .storeAddress(contractAddress) // response destination
+            .storeBit(0)               // no custom payload
+            .storeCoins(0)             // forward amount
+            .storeBit(0)               // no forward payload
+            .endCell();
+
+        const msg = internal({
+            to: jettonWalletAddress,
+            value: toNano('0.01'),
+            bounce: true,
+            body: messageBody
+        });
+
+        await provider.internal(via, {
+            value: toNano('0.1'),
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell().store(storeMessageRelaxed(msg)).endCell()
         });
     }
 
@@ -88,7 +134,7 @@ export class TransferContract implements Contract {
             value: MIN_TON,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
-                .storeUint(2, 4) // op::withdraw = 2
+                .storeUint(2, 32) // op::withdraw = 2
                 .endCell(),
         });
     }
@@ -100,7 +146,7 @@ export class TransferContract implements Contract {
             value: MIN_TON,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
-                .storeUint(3, 4) // op::change_owner = 3
+                .storeUint(3, 32) // op::change_owner = 3
                 .storeAddress(newOwner)
                 .endCell(),
         });

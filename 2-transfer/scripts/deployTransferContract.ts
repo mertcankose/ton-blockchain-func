@@ -7,13 +7,14 @@ export async function run(provider: NetworkProvider) {
         const transferContract = provider.open(
             TransferContract.createFromConfig({
                 value: 0,
-                owner: provider.sender().address!
+                owner: provider.sender().address!,
+                jettonBalance: 0n
             }, 
             await compile('TransferContract'))
         );
 
         // Deploy için gereken minimum miktar (0.1 TON önerilen)
-        const DEPLOY_AMOUNT = toNano('0.1');
+        const DEPLOY_AMOUNT = toNano('0.01');
 
         console.log('Deploying contract...');
         console.log('Contract address:', transferContract.address.toString());
@@ -31,12 +32,13 @@ export async function run(provider: NetworkProvider) {
         console.log('Contract deployed successfully!');
         console.log('Initial value:', contractData.value);
         console.log('Contract owner:', contractData.owner.toString());
-
+        console.log('Jetton balance:', contractData.jettonBalance.toString());
         return {
             success: true,
             address: transferContract.address.toString(),
             owner: contractData.owner.toString(),
-            initialValue: contractData.value
+            initialValue: contractData.value,
+            jettonBalance: contractData.jettonBalance.toString()
         };
 
     } catch (error) {
