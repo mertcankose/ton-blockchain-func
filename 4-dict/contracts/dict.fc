@@ -1,0 +1,144 @@
+#include "imports/stdlib.fc";
+
+;; Storage TL-B: storage#_ total_addresses:uint256 addresses_dict:^Cell = Storage;
+
+;; Op codes
+const int op::get_counter = 0x1234;
+const int op::set_counter = 0x2345;
+const int op::increment = 0x3456;
+const int op::decrement = 0x4567;
+const int op::get_total = 0x5678;
+
+;; Error codes
+const int error::invalid_address = 101;
+const int error::invalid_counter = 102;
+
+;; Load storage
+(int, cell) load_data() inline {
+    var ds = get_data().begin_parse();
+    if (ds.slice_empty?()) {
+        return (0, new_dict());
+    }
+    return (ds~load_uint(256), ds~load_dict()); ;; total_addresses, addresses_dict
+}
+
+;; Save storage
+() save_data(int total_addresses, cell addresses_dict) impure inline {
+    set_data(begin_cell()
+        .store_uint(total_addresses, 256) ;; total_addresses
+        .store_dict(addresses_dict) ;; addresses_dict
+        .end_cell());
+}
+
+;; Get counter value for a specific address
+(int) get_counter_value(slice address, cell addresses_dict) inline {
+    slice addr = address;
+    int addr_int = addr~load_uint(256);
+    (slice value, int found?) = addresses_dict.udict_get?(256, addr_int);
+    if (found?) {
+        return value~load_uint(256);
+    }
+    return 0;
+}
+
+;; Set counter value for an address
+(cell, int) set_counter_value(slice address, int value, cell addresses_dict, int total_addresses) inline {
+    slice addr = address;
+    int addr_int = addr~load_uint(256);
+    (_, int found?) = addresses_dict.udict_get?(256, addr_int);
+    if (~ found?) {
+        total_addresses += 1;
+    }
+    
+    slice value_slice = begin_cell().store_uint(value, 256).end_cell().begin_parse();
+    addresses_dict~udict_set(256, addr_int, value_slice);
+    
+    return (addresses_dict, total_addresses);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+    
+    (int total_addresses, cell addresses_dict) = load_data();
+    
+    int op = in_msg_body~load_uint(32);
+    
+    if (op == op::get_counter) {
+        slice target_address = in_msg_body~load_msg_addr();
+        int counter = get_counter_value(target_address, addresses_dict);
+        ;; Return counter value in a message
+        cell msg = begin_cell()
+            .store_uint(0x10, 6) ;; nobounce
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(counter, 256)
+            .end_cell();
+        send_raw_message(msg, 64);
+        return ();
+    }
+    
+    if (op == op::set_counter) {
+        slice target_address = in_msg_body~load_msg_addr();
+        int new_value = in_msg_body~load_uint(256);
+        throw_if(error::invalid_counter, new_value < 0);
+        (addresses_dict, total_addresses) = set_counter_value(target_address, new_value, addresses_dict, total_addresses);
+        save_data(total_addresses, addresses_dict);
+        return ();
+    }
+    
+    if (op == op::increment) {
+        slice target_address = in_msg_body~load_msg_addr();
+        int current = get_counter_value(target_address, addresses_dict);
+        (addresses_dict, total_addresses) = set_counter_value(target_address, current + 1, addresses_dict, total_addresses);
+        save_data(total_addresses, addresses_dict);
+        return ();
+    }
+    
+    if (op == op::decrement) {
+        slice target_address = in_msg_body~load_msg_addr();
+        int current = get_counter_value(target_address, addresses_dict);
+        throw_if(error::invalid_counter, current == 0);
+        (addresses_dict, total_addresses) = set_counter_value(target_address, current - 1, addresses_dict, total_addresses);
+        save_data(total_addresses, addresses_dict);
+        return ();
+    }
+    
+    if (op == op::get_total) {
+        ;; Return total addresses in a message
+        cell msg = begin_cell()
+            .store_uint(0x10, 6) ;; nobounce
+            .store_slice(sender_address)
+            .store_coins(0)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_uint(total_addresses, 256)
+            .end_cell();
+        send_raw_message(msg, 64);
+        return ();
+    }
+    
+    throw(0xffff); ;; Operation not supported
+}
+
+;; Get methods
+
+;; Returns counter value for given address
+int counter_value(slice address) method_id {
+    (_, cell addresses_dict) = load_data();
+    return get_counter_value(address, addresses_dict);
+}
+
+;; Returns total number of addresses in the system
+int total_addresses() method_id {
+    (int total, _) = load_data();
+    return total;
+}
