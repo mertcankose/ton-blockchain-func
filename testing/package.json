@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@ton/core": "^0.60.1",
+    "@ton/ton": "^15.2.1"
+  }
+}
