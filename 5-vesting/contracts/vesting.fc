@@ -1,7 +1,5 @@
 #include "imports/stdlib.fc";
 
-;; ---------- Common Operation Codes ----------
-
 ;; Jetton Standard Operations (TEP-74)
 const int op::transfer = 0xf8a7ea5;
 const int op::transfer_notification = 0x7362d09c;
@@ -14,12 +12,9 @@ const int op::send_jettons = 0x7777;
 const int op::report_status = 0x7FEE;
 const int op::claim_unlocked = 0x8888;
 
-;; ---------- Common Error Codes ----------
-
 ;; Common Errors
 const int error::invalid_op = 0xffff;  ;; Invalid operation
 const int error::access_denied = 0xffa0; ;; Access denied
-const int error::insufficient_funds = 0xffa1; ;; Insufficient funds
 const int error::invalid_amount = 0xffa2; ;; Invalid amount
 const int error::message_expired = 0xffa4; ;; Message expired
 const int error::not_owner = 0xffa5; ;; Not owner
@@ -31,8 +26,6 @@ const int error::vesting_locked = 0xff02; ;; Tokens still locked by vesting rule
 const int error::not_in_whitelist = 0xff03; ;; Address not in whitelist
 const int error::invalid_params = 0xff04; ;; Invalid vesting parameters
 const int error::funds_locked = 0xff05; ;; Cannot send locked funds
-
-;; ---------- Other Constants ----------
 
 ;; Send Modes
 const int send_mode::regular = 0; ;; Pay fee separately
@@ -51,17 +44,17 @@ const int vesting::min_amount = 1000000000; ;; Minimum vesting amount (1 JETTON 
 
 ;; address utils
 const int ADDRESS_SIZE = 264; ;; 256 + 8
+
 (int, int) unpack_address(slice address) inline {
     int wc = address~load_int(8);
     int address_hash = address~load_uint(256);
     return (wc, address_hash);
 }
+
 slice pack_address(slice address) inline {
     (int wc, int address_hash) = parse_std_addr(address);
     return begin_cell().store_int(wc, 8).store_uint(address_hash, 256).end_cell().begin_parse();
 }
-
-;; ---------- Utility Functions ----------
 
 ;; Helper to compare two addresses
 int equal_slices(slice a, slice b) {
@@ -567,13 +560,4 @@ int validate_vesting_params(int vesting_total_duration, int unlock_period, int c
     }
   
     return -1; ;; All checks passed
-}
-
-int test_method() method_id {
-    return 42;
-}
-
-int get_simple_test() method_id {
-    var (vesting_total_amount, _, _, _, _, _, _, _, _, _, _) = load_data();
-    return vesting_total_amount;
 }
