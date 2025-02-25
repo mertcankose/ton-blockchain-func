@@ -7,6 +7,7 @@ import {
   ContractProvider,
   Sender,
   SendMode,
+  toNano,
 } from "@ton/core";
 
 export const VestingOpcodes = {
@@ -76,6 +77,19 @@ export class Vesting implements Contract {
     });
   }
 
+  async addWhitelist(provider: ContractProvider, via: Sender, address: Address) {
+    const queryId = BigInt(Math.floor(Math.random() * 10000000000));
+    await provider.internal(via, {
+      value: toNano('0.05'), // Add proper gas amount
+      sendMode: SendMode.PAY_GAS_SEPARATELY,
+      body: beginCell()
+        .storeUint(VestingOpcodes.add_whitelist_internal, 32)
+        .storeUint(queryId, 64)
+        .storeAddress(address)
+        .endCell(),
+    });
+}
+
   async testMethod(provider: ContractProvider) {
     const result = await provider.get("test_method", []);
     return result.stack.readNumber();
@@ -84,6 +98,20 @@ export class Vesting implements Contract {
   async getSimpleTest(provider: ContractProvider) {
     const result = await provider.get("get_simple_test", []);
     return result.stack.readNumber();
+  }
+
+  async getLockedAmount(provider: ContractProvider, atTime: number) {
+    const result = await provider.get("get_locked_amount", [
+      { type: "int", value: BigInt(atTime) },
+    ]);
+    return result.stack.readBigNumber();
+  }
+
+  async getUnlockedAmount(provider: ContractProvider, atTime: number) {
+    const result = await provider.get("get_unlocked_amount", [
+      { type: "int", value: BigInt(atTime) },
+    ]);
+    return result.stack.readBigNumber();
   }
 
   async getCurrentLockedAmount(provider: ContractProvider) {
@@ -104,7 +132,7 @@ export class Vesting implements Contract {
   async getWhitelist(provider: ContractProvider) {
     const result = await provider.get("get_whitelist", []);
     console.log("result: ", result.stack);
-    return result.stack.readCell();
+    return result.stack.readTuple();
   }
 
   async getIsWhitelisted(provider: ContractProvider, address: Address) {

@@ -43,7 +43,7 @@ const int vesting::max_period = 4294967295; ;; Maximum vesting period in seconds
 const int vesting::min_amount = 1000000000; ;; Minimum vesting amount (1 JETTON in nanotons)
 
 ;; address utils
-const int ADDRESS_SIZE = 264; ;; 256 + 8
+const int ADDRESS_SIZE = 267; ;; 256 + 8
 
 (int, int) unpack_address(slice address) inline {
     int wc = address~load_int(8);
@@ -185,7 +185,7 @@ int is_whitelisted(slice address, cell whitelist_dict) inline {
 ;; Add address to whitelist
 cell add_to_whitelist(cell whitelist, slice address) impure inline {
     (int wc, int addr_hash) = parse_std_addr(address);
-    return whitelist.udict_set_builder(267, addr_hash, begin_cell().store_int(-1, 1));
+    return whitelist.udict_set_builder(ADDRESS_SIZE, addr_hash, begin_cell().store_int(-1, 1));
 }
 
 ;; Verify if jetton transfer is allowed according to vesting rules
@@ -345,14 +345,14 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
     
         ;; Send success status
         var msg = begin_cell()
-      .store_uint(0x18, 6)
-      .store_slice(sender_addr)
-      .store_coins(0)
-      .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-      .store_uint(op::report_status, 32)
-      .store_uint(query_id, 64)
-      .store_uint(1, 32)  ;; Success
-      .end_cell();
+        .store_uint(0x18, 6)
+        .store_slice(sender_addr)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op::report_status, 32)
+        .store_uint(query_id, 64)
+        .store_uint(1, 32)  ;; Success
+        .end_cell();
     
         send_raw_message(msg, send_mode::carry_remaining_gas);  ;; send mode 64 = carry remaining gas
         return ();
@@ -380,14 +380,14 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
     
         ;; Send success status
         var msg = begin_cell()
-      .store_uint(0x18, 6)
-      .store_slice(from_addr)
-      .store_coins(0)
-      .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-      .store_uint(op::report_status, 32)
-      .store_uint(query_id, 64)
-      .store_uint(1, 32)  ;; Success
-      .end_cell();
+        .store_uint(0x18, 6)
+        .store_slice(from_addr)
+        .store_coins(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_uint(op::report_status, 32)
+        .store_uint(query_id, 64)
+        .store_uint(1, 32)  ;; Success
+        .end_cell();
     
         send_raw_message(msg, send_mode::carry_remaining_gas);  ;; send mode 64 = carry remaining gas
         return ();
@@ -453,7 +453,6 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
     throw(error::invalid_op);
 }
 
-;; ---------- Get Methods ----------
 
 ;; Get vesting parameters
 (int, int, int, int, int, slice, slice, int, slice, slice, cell) get_vesting_data() method_id {

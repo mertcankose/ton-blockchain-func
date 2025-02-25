@@ -8,15 +8,15 @@ export async function run(provider: NetworkProvider) {
   const vestingContract = provider.open(Vesting.createFromAddress(vestingContractAddress));
 
   try {
-    const currentLockedAmount = await vestingContract.getCurrentLockedAmount();
-    console.log("Current Locked Amount:", currentLockedAmount);
+    const unlockedAmount = await vestingContract.getUnlockedAmount(1745683656);
+    console.log("Unlocked Amount:", unlockedAmount);
 
     return {
-      currentLockedAmount: currentLockedAmount
+      unlockedAmount: unlockedAmount
     };
 
   } catch (error) {
-    console.error("Error fetching current locked amount:", error);
+    console.error("Error fetching unlocked amount:", error);
     throw error;
   }
 }
