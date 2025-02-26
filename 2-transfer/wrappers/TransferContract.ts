@@ -91,6 +91,7 @@ export class TransferContract implements Contract {
         });
     }
 
+    /*
     async sendIncrementWithJetton(
         provider: ContractProvider, 
         via: Sender, 
@@ -107,9 +108,9 @@ export class TransferContract implements Contract {
             .storeUint(0, 64)           // query id
             .storeCoins(amount)         // jetton amount
             .storeAddress(contractAddress) // destination address
-            .storeAddress(contractAddress) // response destination
+            .storeAddress(via.address!) // response destination
             .storeBit(0)               // no custom payload
-            .storeCoins(0)             // forward amount
+            .storeCoins(toNano('0.01'))             // forward amount
             .storeBit(0)               // no forward payload
             .endCell();
 
@@ -122,6 +123,46 @@ export class TransferContract implements Contract {
 
         await provider.internal(via, {
             value: toNano('0.1'),
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell().store(storeMessageRelaxed(msg)).endCell()
+        });
+    }
+    */
+
+    async sendIncrementWithJetton(
+        provider: ContractProvider, 
+        via: Sender, 
+        amount: bigint,
+        jettonWalletAddress: Address
+    ) {
+        // Kontrat adresi
+        const targetAddress = this.address;
+
+        console.log("this address: ", this.address.toString());
+        
+        console.log('Contract address:', targetAddress.toString());
+        console.log('Jetton wallet address:', jettonWalletAddress.toString());
+        console.log('Amount:', amount.toString());
+
+        // Doğrudan Jetton Wallet'a gönderilecek mesaj
+        const msg = internal({
+            to: jettonWalletAddress,
+            value: toNano('0.01'),  // İşlem için yeterli TON
+            bounce: true,
+            body: beginCell()
+                .storeUint(0xf8a7ea5, 32)   // jetton transfer opcode (0xf8a7ea5)
+                .storeUint(0, 64)            // query id
+                .storeCoins(amount)          // jetton amount
+                .storeAddress(targetAddress) // destination address (kontrat)
+                .storeAddress(targetAddress)   // response destination (gönderen)
+                .storeBit(0)                 // no custom payload
+                .storeCoins(toNano('0.01'))  // kontrata iletilecek TON miktarı
+                .storeBit(0)                 // no forward payload
+                .endCell()
+        });
+
+        await provider.internal(via, {
+            value: toNano('0.01'),
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell().store(storeMessageRelaxed(msg)).endCell()
         });

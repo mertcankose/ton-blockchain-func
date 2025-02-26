@@ -16,7 +16,7 @@ export const VestingOpcodes = {
   add_whitelist_internal: 0x1234,
   transfer_notification_internal: 0x7362d09c,
   excesses_internal: 0xd53276db,
-  send_jettons_internal: 0x7777,
+  send_jettons: 0x7777,
 } as const;
 
 export type VestingConfig = {
@@ -77,6 +77,57 @@ export class Vesting implements Contract {
     });
   }
 
+  async sendJettons(
+    provider: ContractProvider, 
+    via: Sender, 
+    opts: {
+      toAddress: Address,
+      jettonAmount: bigint,
+      forwardTonAmount: bigint,
+      queryId?: bigint
+    }
+  ) {
+    const queryId = opts.queryId ?? BigInt(Math.floor(Math.random() * 10000000000));
+    
+    // Calculate the total value to send: forward amount + gas for processing
+    const value = opts.forwardTonAmount + toNano('0.01'); // 0.05 TON for gas
+    
+    await provider.internal(via, {
+      value,
+      sendMode: SendMode.PAY_GAS_SEPARATELY,
+      body: beginCell()
+        .storeUint(VestingOpcodes.send_jettons, 32)
+        .storeUint(queryId, 64)
+        .storeAddress(opts.toAddress)
+        .storeCoins(opts.jettonAmount)
+        .storeCoins(opts.forwardTonAmount)
+        .endCell(),
+    });
+  }
+
+  async claimUnlocked(
+    provider: ContractProvider,
+    via: Sender,
+    opts: {
+      queryId?: bigint
+    } = {}
+  ) {
+    const queryId = opts.queryId ?? BigInt(Math.floor(Math.random() * 10000000000));
+    const seqno = await this.getSeqno(provider);
+    const validUntil = Math.floor(Date.now() / 1000) + 600; // 10 minutes
+    
+    // Create the message body without signature
+    const message = beginCell()
+      .storeUint(seqno, 32) // seqno
+      .storeUint(validUntil, 32) // valid until (10 minutes)
+      .storeUint(VestingOpcodes.claim_unlocked_external, 32) // op
+      .storeUint(queryId, 64) // query_id
+      .endCell();
+    
+    // Send the external message with signature
+    await provider.external(message);
+  }
+
   async addWhitelist(provider: ContractProvider, via: Sender, address: Address) {
     const queryId = BigInt(Math.floor(Math.random() * 10000000000));
     await provider.internal(via, {
@@ -88,7 +139,7 @@ export class Vesting implements Contract {
         .storeAddress(address)
         .endCell(),
     });
-}
+  }
 
   async testMethod(provider: ContractProvider) {
     const result = await provider.get("test_method", []);

@@ -88,19 +88,29 @@ int equal_slice_bits(slice a, slice b) asm "SDEQ";
 
     ;; Handle jetton transfer notification
     if (op == op::transfer_notification) {
+        ~dump(700);
+        ~dump(sender_address);
+    
         int query_id = in_msg_body~load_uint(64);
         int amount = in_msg_body~load_coins();
         slice from_address = in_msg_body~load_msg_addr();
-        
-        ;; Verify sender is our expected jetton
-        ;;throw_unless(error::invalid_jetton, equal_slice_bits(sender_address, JETTON_MASTER_ADDRESS));
-        
+    
+        ~dump(query_id);
+        ~dump(amount);
+        ~dump(from_address);
+    
+        ;; Gönderenin Jetton Wallet olduğunu kontrol et (çok katı kontrol yapmayın)
+        ;; throw_unless(error::invalid_jetton, equal_slice_bits(sender_address, expected_jetton_wallet));
+    
         ;; Update jetton balance
         jetton_balance += amount;
-        
+    
         ;; Increment value
         value += 1;
-        
+    
+        ~dump(value);
+        ~dump(jetton_balance);
+    
         save_data(value, owner_address, jetton_balance);
         return ();
     }

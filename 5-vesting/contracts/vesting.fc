@@ -405,11 +405,16 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
         slice to_addr = in_msg_body~load_msg_addr();
         int jetton_amount = in_msg_body~load_coins();
         int forward_ton_amount = in_msg_body~load_coins();
+
+        ~dump(to_addr);
+        ~dump(jetton_amount);
+        ~dump(forward_ton_amount);
     
         ;; Calculate locked amount
         int locked_amount = calculate_locked_amount(vesting_total_amount, vesting_start_time, 
             vesting_total_duration, unlock_period, cliff_duration, now());
-    
+
+        ~dump(locked_amount);
         ;; Verify transfer allowed 
         throw_unless(error::funds_locked, verify_jetton_transfer(to_addr, jetton_amount, locked_amount, whitelist, vesting_sender_address));
     
