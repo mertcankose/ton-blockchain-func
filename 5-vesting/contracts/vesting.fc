@@ -3,7 +3,6 @@
 ;; Jetton Standard Operations (TEP-74)
 const int op::transfer = 0xf8a7ea5;
 const int op::transfer_notification = 0x7362d09c;
-const int op::internal_transfer = 0x178d4519;
 const int op::excesses = 0xd53276db;
 
 ;; Vesting Operations
@@ -16,9 +15,7 @@ const int op::claim_unlocked = 0x8888;
 const int error::invalid_op = 0xffff;  ;; Invalid operation
 const int error::access_denied = 0xffa0; ;; Access denied
 const int error::invalid_amount = 0xffa2; ;; Invalid amount
-const int error::message_expired = 0xffa4; ;; Message expired
 const int error::not_owner = 0xffa5; ;; Not owner
-const int error::invalid_signature = 0xffa6; ;; Invalid signature
 
 ;; Vesting Specific Errors
 const int error::vesting_not_started = 0xff01; ;; Vesting period not started yet
@@ -195,74 +192,6 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
     return -1; ;; Can freely transfer unlocked jettons
 }
 
-;; Process external message (from owner public key)
-() recv_external(slice in_msg) impure {
-    var signature = in_msg~load_bits(512);
-    var cs = in_msg;
-    var (msg_seqno, valid_until) = (cs~load_uint(32), cs~load_uint(32));
-    throw_if(error::message_expired, valid_until <= now());
-  
-    var (vesting_total_amount, vesting_start_time, vesting_total_duration, 
-        unlock_period, cliff_duration, vesting_sender_address, 
-        owner_address, seqno, 
-        jetton_master_address, whitelist) = load_data();
-  
-    throw_unless(33, msg_seqno == seqno);
-  
-    var hash = slice_hash(in_msg);
-    ;;throw_unless(error::invalid_signature, check_signature(hash, signature, public_key));
-  
-    accept_message();
-  
-    ;; Parse message
-    int op = in_msg~load_uint(32);
-    int query_id = in_msg~load_uint(64);
-  
-    if (op == op::send_jettons) {
-        slice to_addr = in_msg~load_msg_addr();
-        int jetton_amount = in_msg~load_coins();
-        int forward_ton_amount = in_msg~load_coins();
-        slice jetton_wallet_address = in_msg~load_msg_addr();
-    
-        ;; Calculate locked amount
-        int locked_amount = calculate_locked_amount(vesting_total_amount, vesting_start_time, 
-            vesting_total_duration, unlock_period, cliff_duration, now());
-    
-        ;; Verify transfer allowed 
-        throw_unless(error::not_in_whitelist, verify_jetton_transfer(to_addr, jetton_amount, locked_amount, whitelist, vesting_sender_address));
-    
-        ;; Create jetton transfer message
-        var msg = begin_cell()
-      .store_uint(0x18, 6)
-      .store_slice(jetton_wallet_address)
-      .store_coins(forward_ton_amount + gas::jetton_transfer) ;; forward amount + gas
-      .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-      .store_ref(
-            begin_cell()
-          .store_uint(op::transfer, 32)
-          .store_uint(query_id, 64)
-          .store_coins(jetton_amount)
-          .store_slice(to_addr)
-          .store_slice(owner_address) ;; response destination
-          .store_uint(0, 1) ;; No custom payload
-          .store_coins(forward_ton_amount)
-          .store_uint(0, 1) ;; No forward payload
-        .end_cell()
-        );
-    
-        send_raw_message(msg.end_cell(), send_mode::pay_gas_separately); ;; Pay transfer fees separately, ignore errors
-    
-        ;; Increment seqno
-        save_data(vesting_total_amount, vesting_start_time, vesting_total_duration, 
-            unlock_period, cliff_duration, vesting_sender_address, 
-            owner_address, seqno + 1, 
-            jetton_master_address, whitelist);
-        return ();
-    }
-  
-    throw(error::invalid_op); ;; Unknown operation
-}
-
 ;; Rest of the contract remains the same...
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
     if (in_msg_body.slice_empty?()) {
@@ -316,43 +245,52 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
         return ();
     }
   
-    if (op == op::transfer_notification) {
-        ;; Only accept jettons from our jetton wallet
-        ;;throw_unless(error::access_denied, equal_slices(sender_addr, jetton_wallet_address));
-    
-        int jetton_amount = in_msg_body~load_coins();
-        slice from_addr = in_msg_body~load_msg_addr();
-    
-        ;; We received jettons, accept them
-        ;; For initial funding, update the total vesting amount
-        if (vesting_total_amount == 0) {
-            ;; This is initial funding, set the vesting_total_amount
-            vesting_total_amount = jetton_amount;
-      
-            ;; Update storage
-            save_data(vesting_total_amount, vesting_start_time, vesting_total_duration, 
-                unlock_period, cliff_duration, vesting_sender_address, 
-                owner_address, seqno, 
-                jetton_master_address, whitelist);
-        }
-    
-        ;; Send success status
-        var msg = begin_cell()
-        .store_uint(0x18, 6)
-        .store_slice(from_addr)
-        .store_coins(0)
-        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-        .store_uint(op::report_status, 32)
-        .store_uint(query_id, 64)
-        .store_uint(1, 32)  ;; Success
-        .end_cell();
-    
-        send_raw_message(msg, send_mode::carry_remaining_gas);  ;; send mode 64 = carry remaining gas
-        return ();
-    }
   
     if (op == op::excesses) {
         ;; Ignore excesses notifications
+        return ();
+    }
+
+    if (op == op::claim_unlocked) {
+
+        slice jetton_wallet_address = in_msg_body~load_msg_addr();
+
+        ;; Calculate unlocked amount
+        int unlocked_amount = calculate_unlocked_amount(vesting_total_amount, vesting_start_time, 
+            vesting_total_duration, unlock_period, cliff_duration, now());
+    
+        ;; Ensure there's something to claim
+        throw_unless(error::invalid_amount, unlocked_amount > 0);
+    
+        ;; Create jetton transfer message to owner
+        var msg = begin_cell()
+      .store_uint(0x18, 6)
+      .store_slice(jetton_wallet_address)
+      .store_coins(gas::jetton_transfer) ;; gas
+      .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+      .store_ref(
+            begin_cell()
+          .store_uint(op::transfer, 32)
+          .store_uint(query_id, 64)
+          .store_coins(unlocked_amount)
+          .store_slice(owner_address)
+          .store_slice(owner_address) ;; response destination
+          .store_uint(0, 1) ;; No custom payload
+          .store_coins(0) ;; No forward ton amount
+          .store_uint(0, 1) ;; No forward payload
+        .end_cell()
+        );
+    
+        send_raw_message(msg.end_cell(), send_mode::pay_gas_separately); ;; Pay transfer fees separately, ignore errors
+    
+        ;; Update vesting amount (reduce by claimed amount)
+        vesting_total_amount -= unlocked_amount;
+    
+        ;; Increment seqno
+        save_data(vesting_total_amount, vesting_start_time, vesting_total_duration, 
+            unlock_period, cliff_duration, vesting_sender_address, 
+            owner_address, seqno + 1, 
+            jetton_master_address, whitelist);
         return ();
     }
 

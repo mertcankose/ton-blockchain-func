@@ -12,7 +12,7 @@ import {
 
 export const VestingOpcodes = {
   send_jettons_external: 0x7777,
-  claim_unlocked_external: 0x8888,
+  claim_unlocked: 0x8888,
   add_whitelist_internal: 0x1234,
   transfer_notification_internal: 0x7362d09c,
   excesses_internal: 0xd53276db,
@@ -76,21 +76,22 @@ export class Vesting implements Contract {
   }
 
   async sendJettons(
-    provider: ContractProvider, 
-    via: Sender, 
+    provider: ContractProvider,
+    via: Sender,
     opts: {
-      toAddress: Address,
-      jettonAmount: bigint,
-      forwardTonAmount: bigint,
-      jettonWalletAddress: Address,
-      queryId?: bigint
+      toAddress: Address;
+      jettonAmount: bigint;
+      forwardTonAmount: bigint;
+      jettonWalletAddress: Address;
+      queryId?: bigint;
     }
   ) {
-    const queryId = opts.queryId ?? BigInt(Math.floor(Math.random() * 10000000000));
-    
+    const queryId =
+      opts.queryId ?? BigInt(Math.floor(Math.random() * 10000000000));
+
     // Calculate the total value to send: forward amount + gas for processing
-    const value = opts.forwardTonAmount + toNano('0.01'); // 0.05 TON for gas
-    
+    const value = opts.forwardTonAmount + toNano("0.01"); // 0.05 TON for gas
+
     await provider.internal(via, {
       value,
       sendMode: SendMode.PAY_GAS_SEPARATELY,
@@ -109,29 +110,31 @@ export class Vesting implements Contract {
     provider: ContractProvider,
     via: Sender,
     opts: {
-      queryId?: bigint
-    } = {}
+      jettonWalletAddress: Address;
+    }
   ) {
-    const queryId = opts.queryId ?? BigInt(Math.floor(Math.random() * 10000000000));
-    const seqno = await this.getSeqno(provider);
-    const validUntil = Math.floor(Date.now() / 1000) + 600; // 10 minutes
-    
-    // Create the message body without signature
-    const message = beginCell()
-      .storeUint(seqno, 32) // seqno
-      .storeUint(validUntil, 32) // valid until (10 minutes)
-      .storeUint(VestingOpcodes.claim_unlocked_external, 32) // op
-      .storeUint(queryId, 64) // query_id
-      .endCell();
-    
-    // Send the external message with signature
-    await provider.external(message);
+    const queryId = BigInt(Math.floor(Math.random() * 10000000000));
+    const value = toNano("0.01");
+
+    await provider.internal(via, {
+      value,
+      sendMode: SendMode.PAY_GAS_SEPARATELY,
+      body: beginCell()
+        .storeUint(VestingOpcodes.claim_unlocked, 32)
+        .storeUint(queryId, 64)
+        .storeAddress(opts.jettonWalletAddress)
+        .endCell(),
+    });
   }
 
-  async addWhitelist(provider: ContractProvider, via: Sender, address: Address) {
+  async addWhitelist(
+    provider: ContractProvider,
+    via: Sender,
+    address: Address
+  ) {
     const queryId = BigInt(Math.floor(Math.random() * 10000000000));
     await provider.internal(via, {
-      value: toNano('0.05'), // Add proper gas amount
+      value: toNano("0.05"), // Add proper gas amount
       sendMode: SendMode.PAY_GAS_SEPARATELY,
       body: beginCell()
         .storeUint(VestingOpcodes.add_whitelist_internal, 32)
@@ -210,8 +213,7 @@ export class Vesting implements Contract {
         ownerAddress: result.stack.readAddress(),
         seqno: result.stack.readNumber(),
         jettonMasterAddress: result.stack.readAddress(),
-        jettonWalletAddress: result.stack.readAddress(),
-        //whitelist: result.stack.readCell(),
+        whitelist: result.stack.readCell(),
       };
     } catch (error) {
       console.error("Error in getVestingData:", error);

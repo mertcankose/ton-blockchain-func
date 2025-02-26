@@ -1,35 +1,45 @@
 import { Address } from "@ton/ton";
 import { Vesting } from "../wrappers/Vesting";
-import { NetworkProvider } from '@ton/blueprint';
-import { CONTRACT_ADDRESS } from "../key";
+import { NetworkProvider } from "@ton/blueprint";
+import { CONTRACT_ADDRESS, JETTON_WALLET_ADDRESS } from "../key";
 
 export async function run(provider: NetworkProvider) {
   const vestingContractAddress = Address.parse(CONTRACT_ADDRESS);
-  
-  const vestingContract = provider.open(Vesting.createFromAddress(vestingContractAddress));
+
+  const vestingContract = provider.open(
+    Vesting.createFromAddress(vestingContractAddress)
+  );
 
   try {
     // Get current unlocked amount before claiming
     const unlockedBefore = await vestingContract.getCurrentUnlockedAmount();
-    console.log("Current unlocked amount before claiming:", unlockedBefore.toString());
+    console.log(
+      "Current unlocked amount before claiming:",
+      unlockedBefore.toString()
+    );
 
     // Claim unlocked tokens
     const claimResult = await vestingContract.claimUnlocked(
       provider.provider(vestingContractAddress),
-      provider.sender()
+      provider.sender(),
+      {
+        jettonWalletAddress: Address.parse(JETTON_WALLET_ADDRESS),
+      }
     );
     console.log("Claim Unlocked Result:", claimResult);
 
     // Get current unlocked amount after claiming
     const unlockedAfter = await vestingContract.getCurrentUnlockedAmount();
-    console.log("Current unlocked amount after claiming:", unlockedAfter.toString());
+    console.log(
+      "Current unlocked amount after claiming:",
+      unlockedAfter.toString()
+    );
 
     return {
-      claimResult: claimResult
+      claimResult: claimResult,
     };
-
   } catch (error) {
     console.error("Error claiming unlocked tokens:", error);
     throw error;
   }
-} 
+}
