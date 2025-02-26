@@ -2,11 +2,12 @@ import { Dictionary, toNano } from '@ton/core';
 import { Vesting } from '../wrappers/Vesting';
 import { compile, NetworkProvider } from '@ton/blueprint';
 import { Address } from '@ton/core';
+import { JETTON_MASTER_ADDRESS, JETTON_WALLET_ADDRESS } from '../key';
 
 export async function run(provider: NetworkProvider) {
     try {
-        const jettonMasterAddress = Address.parse('EQCsLX9gqd0p7aG9C847wastVwvGzGSj-5r4nJT1AIe37pd5');
-        const jettonWalletAddress = Address.parse("EQCN8p6k3QOW7WFcec0XJbApdnk9oNWrRdaQyt1oidkixeSD");
+        const jettonMasterAddress = Address.parse(JETTON_MASTER_ADDRESS);
+        //const jettonWalletAddress = Address.parse(JETTON_WALLET_ADDRESS);
 
         const now = Math.floor(Date.now() / 1000);
 
@@ -21,7 +22,6 @@ export async function run(provider: NetworkProvider) {
                 owner_address: provider.sender().address!,
                 seqno: 0,
                 jetton_master_address: jettonMasterAddress,
-                jetton_wallet_address: jettonWalletAddress,
             }, 
             await compile('Vesting'))
         );

@@ -1,9 +1,10 @@
 import { Address, beginCell, Cell, Contract,internal, contractAddress, ContractProvider, Sender, SendMode, toNano, storeMessageRelaxed } from '@ton/core';
+import { JETTON_MASTER_ADDRESS } from '../keys';
 
 export type TransferContractConfig = {
     value: number;
     owner: Address;
-    jettonBalance: bigint;
+    jettonBalance: number;
 };
 
 export function transferContractConfigToCell(config: TransferContractConfig): Cell {
@@ -15,7 +16,7 @@ export function transferContractConfigToCell(config: TransferContractConfig): Ce
 }
 
 export class TransferContract implements Contract {
-    static JETTON_MASTER_ADDRESS = Address.parse("EQDH9xFK9PEWo9oAewycehyUpOZkVKVPgo3agWJ0kb5_e28T");
+    static JETTON_MASTER_ADDRESS = Address.parse(JETTON_MASTER_ADDRESS);
     constructor(
         readonly address: Address,
         readonly init?: { code: Cell; data: Cell },
@@ -72,7 +73,7 @@ export class TransferContract implements Contract {
 
     async getJettonBalance(provider: ContractProvider) {
         const { stack } = await provider.get('get_jetton_balance', []);
-        return stack.readBigNumber();
+        return stack.readNumber();
     }
 
     // Increment the counter (anyone can call)
@@ -147,7 +148,7 @@ export class TransferContract implements Contract {
             value: toNano('0.05'), // Gaz değerini arttırdım
             bounce: true,
             body: beginCell()
-                .storeUint(0x0f8a7ea5, 32)   // Doğru opcode (başında 0 var)
+                .storeUint(0x0f8a7ea5, 32)   // opcode
                 .storeUint(0, 64)            // query id
                 .storeCoins(amount)          // jetton miktarı
                 .storeAddress(targetAddress) // hedef adres (kontrat)

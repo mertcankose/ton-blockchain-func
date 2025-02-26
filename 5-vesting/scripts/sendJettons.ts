@@ -1,9 +1,10 @@
 import { address, Address, toNano } from "@ton/ton";
 import { Vesting } from "../wrappers/Vesting";
 import { NetworkProvider } from '@ton/blueprint';
+import { CONTRACT_ADDRESS, JETTON_WALLET_ADDRESS } from "../key";
 
 export async function run(provider: NetworkProvider) {
-  const vestingContractAddress = Address.parse("EQBNGE5xY-XvSbUDcXIxWdTmMnTqyJUd5p2yeZdxzyqGnI2e");
+  const vestingContractAddress = Address.parse(CONTRACT_ADDRESS);
   
   const vestingContract = provider.open(Vesting.createFromAddress(vestingContractAddress));
 
@@ -12,8 +13,9 @@ export async function run(provider: NetworkProvider) {
         provider.sender(),
         {
             toAddress: provider.sender().address!,
-            jettonAmount: toNano('10000000000'), // 10 JETTON
+            jettonAmount: toNano('10'), // 10 JETTON
             forwardTonAmount: toNano('0.01'),
+            jettonWalletAddress: Address.parse(JETTON_WALLET_ADDRESS)
         }
     );
     console.log("Send Jettons:", sendJettons);

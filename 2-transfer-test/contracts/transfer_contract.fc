@@ -31,7 +31,7 @@ int equal_slice_bits(slice a, slice b) asm "SDEQ";
     return (
         ds~load_uint(64),      ;; value
         ds~load_msg_addr(),     ;; owner_address
-        ds~load_uint(64)       ;; jetton_balance
+        ds~load_coins()       ;; jetton_balance
     );
 }
 
@@ -40,7 +40,7 @@ int equal_slice_bits(slice a, slice b) asm "SDEQ";
         begin_cell()
             .store_uint(value, 64)
             .store_slice(owner_address)
-            .store_uint(jetton_balance, 64)
+            .store_coins(jetton_balance)
         .end_cell()
     );
 }
@@ -83,35 +83,21 @@ int equal_slice_bits(slice a, slice b) asm "SDEQ";
     ;; Load contract data
     (int value, slice owner_address, int jetton_balance) = load_data();
     
-    ;; Parse op
+
     int op = in_msg_body~load_uint(32);
 
     ;; Handle jetton transfer notification
     if (op == op::transfer_notification) {
-        ~dump(700);
-        ~dump(sender_address);
-    
         int query_id = in_msg_body~load_uint(64);
         int amount = in_msg_body~load_coins();
         slice from_address = in_msg_body~load_msg_addr();
-        
-        ~dump(query_id);
-        ~dump(amount);
-        ~dump(from_address);
-        
-        ;; Jetton balance'ı güncelle
+
         jetton_balance += amount;
-    
-        ;; Değeri arttır
         value += 1;
-    
-        ~dump(value);
-        ~dump(jetton_balance);
     
         save_data(value, owner_address, jetton_balance);
         return ();
     }
-    
     ;; Increment operation - anyone can do
     if (op == op::increment) {
         ;; Check if enough fee is attached

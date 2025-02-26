@@ -29,7 +29,6 @@ export type VestingConfig = {
   owner_address: Address;
   seqno: number;
   jetton_master_address: Address;
-  jetton_wallet_address: Address;
 };
 
 export function vestingConfigToCell(config: VestingConfig): Cell {
@@ -46,7 +45,6 @@ export function vestingConfigToCell(config: VestingConfig): Cell {
   // Store the remaining addresses in a reference cell
   const refCell = beginCell()
     .storeAddress(config.jetton_master_address)
-    .storeAddress(config.jetton_wallet_address)
     .endCell();
 
   // Store the reference cell in the main cell
@@ -84,6 +82,7 @@ export class Vesting implements Contract {
       toAddress: Address,
       jettonAmount: bigint,
       forwardTonAmount: bigint,
+      jettonWalletAddress: Address,
       queryId?: bigint
     }
   ) {
@@ -101,6 +100,7 @@ export class Vesting implements Contract {
         .storeAddress(opts.toAddress)
         .storeCoins(opts.jettonAmount)
         .storeCoins(opts.forwardTonAmount)
+        .storeAddress(opts.jettonWalletAddress)
         .endCell(),
     });
   }
