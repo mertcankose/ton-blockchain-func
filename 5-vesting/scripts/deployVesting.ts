@@ -1,4 +1,4 @@
-import { Dictionary, toNano } from '@ton/core';
+import { toNano } from '@ton/core';
 import { Vesting } from '../wrappers/Vesting';
 import { compile, NetworkProvider } from '@ton/blueprint';
 import { Address } from '@ton/core';
@@ -13,10 +13,10 @@ export async function run(provider: NetworkProvider) {
 
         const vestingContract = provider.open(
             Vesting.createFromConfig({
-                vesting_total_amount: toNano('100'), // 100 JETTON
+                vesting_total_amount: toNano('1000'), // 100 JETTON
                 vesting_start_time: now, 
-                vesting_total_duration: 365 * 24 * 60 * 60, // 1 year
-                unlock_period: 30 * 24 * 60 * 60, // 30 days
+                vesting_total_duration: 24 * 60 * 60, // 1 day
+                unlock_period: 60 * 60, // 1 hour
                 cliff_duration: 0,
                 vesting_sender_address: provider.sender().address!,
                 owner_address: provider.sender().address!,
