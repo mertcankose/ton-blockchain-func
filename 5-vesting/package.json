@@ -4,7 +4,8 @@
     "scripts": {
         "start": "blueprint run",
         "build": "blueprint build",
-        "test": "jest --verbose"
+        "test": "jest --verbose",
+        "transfer": "ts-node scripts/sendJetton.ts"
     },
     "devDependencies": {
         "@ton/blueprint": "^0.28.0",

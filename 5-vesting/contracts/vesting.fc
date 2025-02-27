@@ -222,9 +222,6 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
         ;; forward payload
         slice forward_payload = in_msg_body;
         
-        ~dump(jetton_amount);
-        ~dump(from_address);
-        
         var (vesting_total_amount, vesting_start_time, vesting_total_duration, 
             unlock_period, cliff_duration, vesting_sender_address, 
             owner_address, seqno, 
@@ -236,23 +233,9 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
             unlock_period, cliff_duration, vesting_sender_address, 
             owner_address, seqno, 
             jetton_master_address, whitelist);
-        
-        ;; send success status
-        var report_msg = begin_cell()
-            .store_uint(0x18, 6)
-            .store_slice(from_address)  ;; Token'ı gönderen adrese yanıt gönder
-            .store_coins(0)
-            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-            .store_uint(op::report_status, 32)
-            .store_uint(query_id, 64)
-            .store_uint(1, 32)  ;; Success
-            .store_slice("Received jettons successfully")
-            .end_cell();
-        
-        send_raw_message(report_msg, send_mode::pay_gas_separately);
         return ();
     }
-  
+
     if (op == op::add_whitelist) {
         ;; Only vesting_sender_address can add to whitelist
         throw_unless(error::access_denied, equal_slices(sender_addr, vesting_sender_address));
@@ -264,19 +247,6 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
             unlock_period, cliff_duration, vesting_sender_address, 
             owner_address, seqno, 
             jetton_master_address, whitelist);
-    
-        ;; Send success status
-        var msg = begin_cell()
-        .store_uint(0x18, 6)
-        .store_slice(sender_addr)
-        .store_coins(0)
-        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-        .store_uint(op::report_status, 32)
-        .store_uint(query_id, 64)
-        .store_uint(1, 32)  ;; Success
-        .end_cell();
-    
-        send_raw_message(msg, send_mode::carry_remaining_gas);  ;; send mode 64 = carry remaining gas
         return ();
     }
   
@@ -337,15 +307,10 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
         int forward_ton_amount = in_msg_body~load_coins();
         slice jetton_wallet_address = in_msg_body~load_msg_addr();
 
-        ~dump(to_addr);
-        ~dump(jetton_amount);
-        ~dump(forward_ton_amount);
-
         ;; Calculate locked amount
         int locked_amount = calculate_locked_amount(vesting_total_amount, vesting_start_time, 
             vesting_total_duration, unlock_period, cliff_duration, now());
 
-        ~dump(locked_amount);
         ;; Verify transfer allowed 
         throw_unless(error::funds_locked, verify_jetton_transfer(to_addr, jetton_amount, locked_amount, whitelist, vesting_sender_address));
     
@@ -367,21 +332,8 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
           .store_uint(0, 1) ;; No forward payload
         .end_cell()
         );
-    
+        
         send_raw_message(msg.end_cell(), send_mode::pay_gas_separately); ;; Pay transfer fees separately, ignore errors
-    
-        ;; Send success status
-        var report_msg = begin_cell()
-      .store_uint(0x18, 6)
-      .store_slice(sender_addr)
-      .store_coins(0)
-      .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-      .store_uint(op::report_status, 32)
-      .store_uint(query_id, 64)
-      .store_uint(1, 32)  ;; Success
-      .end_cell();
-    
-        send_raw_message(report_msg, send_mode::carry_remaining_gas);  ;; send mode 64 = carry remaining gas
         return ();
     }
   
@@ -436,6 +388,7 @@ int seqno() method_id {
     return seqno;
 }
 
+;; Get is whitelisted -1 or 0
 int get_is_whitelisted(slice address) method_id {
     var (_, _, _, _, _, _, _, _, _, whitelist_dict) = load_data();
     return is_whitelisted(address, whitelist_dict);
@@ -460,7 +413,6 @@ tuple get_whitelist() method_id {
 
 ;; Validate vesting parameters - useful before deploying contract
 int validate_vesting_params(int vesting_total_duration, int unlock_period, int cliff_duration) method_id {
-    ;; Check basic conditions
     if (vesting_total_duration <= 0) {
         return 0;
     }

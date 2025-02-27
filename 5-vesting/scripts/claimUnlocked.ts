@@ -1,7 +1,7 @@
 import { Address } from "@ton/ton";
 import { Vesting } from "../wrappers/Vesting";
 import { NetworkProvider } from "@ton/blueprint";
-import { CONTRACT_ADDRESS, JETTON_WALLET_ADDRESS } from "../key";
+import { CONTRACT_ADDRESS, JETTON_CONTRACT_WALLET_ADDRESS } from "../key";
 
 export async function run(provider: NetworkProvider) {
   const vestingContractAddress = Address.parse(CONTRACT_ADDRESS);
@@ -11,24 +11,21 @@ export async function run(provider: NetworkProvider) {
   );
 
   try {
-    // Get current unlocked amount before claiming
     const unlockedBefore = await vestingContract.getCurrentUnlockedAmount();
     console.log(
       "Current unlocked amount before claiming:",
       unlockedBefore.toString()
     );
 
-    // Claim unlocked tokens
     const claimResult = await vestingContract.claimUnlocked(
       provider.provider(vestingContractAddress),
       provider.sender(),
       {
-        jettonWalletAddress: Address.parse(JETTON_WALLET_ADDRESS),
+        jettonWalletAddress: Address.parse(JETTON_CONTRACT_WALLET_ADDRESS),
       }
     );
     console.log("Claim Unlocked Result:", claimResult);
 
-    // Get current unlocked amount after claiming
     const unlockedAfter = await vestingContract.getCurrentUnlockedAmount();
     console.log(
       "Current unlocked amount after claiming:",

@@ -17,6 +17,7 @@ export const VestingOpcodes = {
   transfer_notification_internal: 0x7362d09c,
   excesses_internal: 0xd53276db,
   send_jettons: 0x7777,
+  receive_jetton: 0x9999,
 } as const;
 
 export type VestingConfig = {
@@ -75,6 +76,7 @@ export class Vesting implements Contract {
     });
   }
 
+  // contract -> user
   async sendJettons(
     provider: ContractProvider,
     via: Sender,
@@ -89,7 +91,7 @@ export class Vesting implements Contract {
     const queryId =
       opts.queryId ?? BigInt(Math.floor(Math.random() * 10000000000));
 
-    // Calculate the total value to send: forward amount + gas for processing
+
     const value = opts.forwardTonAmount + toNano("0.01"); // 0.05 TON for gas
 
     await provider.internal(via, {
@@ -106,6 +108,7 @@ export class Vesting implements Contract {
     });
   }
 
+  // contract -> user
   async claimUnlocked(
     provider: ContractProvider,
     via: Sender,
@@ -198,7 +201,6 @@ export class Vesting implements Contract {
 
   async getVestingData(provider: ContractProvider) {
     try {
-      // Make sure we're using the exact method name as defined in the contract
       const result = await provider.get("get_vesting_data", []);
 
       console.log("result: ", result.stack);
@@ -213,7 +215,7 @@ export class Vesting implements Contract {
         ownerAddress: result.stack.readAddress(),
         seqno: result.stack.readNumber(),
         jettonMasterAddress: result.stack.readAddress(),
-        whitelist: result.stack.readCell(),
+        //whitelist: result?.stack?.readCell()
       };
     } catch (error) {
       console.error("Error in getVestingData:", error);

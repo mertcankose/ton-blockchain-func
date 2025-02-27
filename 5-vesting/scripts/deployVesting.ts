@@ -2,18 +2,16 @@ import { toNano } from '@ton/core';
 import { Vesting } from '../wrappers/Vesting';
 import { compile, NetworkProvider } from '@ton/blueprint';
 import { Address } from '@ton/core';
-import { JETTON_MASTER_ADDRESS, JETTON_WALLET_ADDRESS } from '../key';
+import { JETTON_MASTER_ADDRESS } from '../key';
 
 export async function run(provider: NetworkProvider) {
     try {
         const jettonMasterAddress = Address.parse(JETTON_MASTER_ADDRESS);
-        //const jettonWalletAddress = Address.parse(JETTON_WALLET_ADDRESS);
-
         const now = Math.floor(Date.now() / 1000);
 
         const vestingContract = provider.open(
             Vesting.createFromConfig({
-                vesting_total_amount: toNano('1000'), // 100 JETTON
+                vesting_total_amount: toNano('0'), // 0 JETTON, when transfer jetton to contract increase this value
                 vesting_start_time: now, 
                 vesting_total_duration: 24 * 60 * 60, // 1 day
                 unlock_period: 60 * 60, // 1 hour
