@@ -116,7 +116,7 @@ export class Vesting implements Contract {
     }
   ) {
     const queryId = BigInt(Math.floor(Math.random() * 10000000000));
-    const value = toNano("0.01");
+    const value = toNano("0.05");
 
     await provider.internal(via, {
       value,
@@ -236,7 +236,7 @@ export class Vesting implements Contract {
         seqno: result.stack.readNumber(),
         jettonMasterAddress: result.stack.readAddress(),
         whitelist: result?.stack?.readCell(),
-        claimedAmount: result.stack.readNumber(),
+        claimedAmount: result.stack.readBigNumber(),
       };
     } catch (error) {
       console.error("Error in getVestingData:", error);
