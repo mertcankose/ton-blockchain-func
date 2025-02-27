@@ -13,8 +13,8 @@ export async function run(provider: NetworkProvider) {
             Vesting.createFromConfig({
                 vesting_total_amount: toNano('0'), // 0 JETTON, when transfer jetton to contract increase this value
                 vesting_start_time: now, 
-                vesting_total_duration: 10 * 24 * 60 * 60, // 10 days
-                unlock_period: 24 * 60 * 60, // 1 day
+                vesting_total_duration: 60 * 60, // 1 hour
+                unlock_period: 6 * 60, // 6 minutes
                 cliff_duration: 0,
                 vesting_sender_address: provider.sender().address!,
                 owner_address: provider.sender().address!,

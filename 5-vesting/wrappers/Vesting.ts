@@ -163,6 +163,13 @@ export class Vesting implements Contract {
     return result.stack.readBigNumber();
   }
 
+  async getTotalUnlockedAmount(provider: ContractProvider, atTime: number) {
+    const result = await provider.get("get_total_unlocked_amount", [
+      { type: "int", value: BigInt(atTime) },
+    ]);
+    return result.stack.readBigNumber();
+  }
+
   async getUnlockedAmount(provider: ContractProvider, atTime: number) {
     const result = await provider.get("get_unlocked_amount", [
       { type: "int", value: BigInt(atTime) },
@@ -175,8 +182,14 @@ export class Vesting implements Contract {
     return result.stack.readBigNumber();
   }
 
+  // account for claimed amount
   async getCurrentUnlockedAmount(provider: ContractProvider) {
     const result = await provider.get("get_current_unlocked_amount", []);
+    return result.stack.readBigNumber();
+  }
+
+  async getCurrentTotalUnlockedAmount(provider: ContractProvider) {
+    const result = await provider.get("get_current_total_unlocked_amount", []);
     return result.stack.readBigNumber();
   }
 
@@ -198,6 +211,21 @@ export class Vesting implements Contract {
     return result.stack.readNumber();
   }
 
+  async getClaimedAmount(provider: ContractProvider) {
+    const result = await provider.get("get_claimed_amount", []);
+    return result.stack.readBigNumber();
+  }
+
+  async validate_vesting_params(provider: ContractProvider, vesting_total_duration: number, unlock_period: number, cliff_duration: number) {
+    const result = await provider.get("validate_vesting_params", [
+      { type: "int", value: BigInt(vesting_total_duration) },
+      { type: "int", value: BigInt(unlock_period) },
+      { type: "int", value: BigInt(cliff_duration) },
+    ]);
+
+    return result.stack.readNumber();
+  }
+
   async getVestingData(provider: ContractProvider) {
     try {
       const result = await provider.get("get_vesting_data", []);
@@ -213,6 +241,7 @@ export class Vesting implements Contract {
         vestingSenderAddress: result.stack.readAddress(),
         ownerAddress: result.stack.readAddress(),
         seqno: result.stack.readNumber(),
+        claimedAmount: result.stack.readBigNumber(),
         jettonMasterAddress: result.stack.readAddress(),
         //whitelist: result?.stack?.readCell()
       };
