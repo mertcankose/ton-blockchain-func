@@ -1,4 +1,4 @@
-import { beginCell, Address, TonClient, WalletContractV4, internal, external, storeMessage, toNano, WalletContractV5R1, SendMode } from '@ton/ton';
+import { beginCell, Address, TonClient, internal, external, storeMessage, toNano, WalletContractV5R1, SendMode } from '@ton/ton';
 import { mnemonicToPrivateKey } from '@ton/crypto';
 import { API_KEY, CONTRACT_ADDRESS, JETTON_MASTER_ADDRESS } from '../key';
 
@@ -22,12 +22,11 @@ async function getUserJettonWalletAddress(userAddress: string, jettonMasterAddre
 
 (async () => {
   try {
-    // Mnemonic'den keyPair oluştur
     const keyPair = await mnemonicToPrivateKey(mnemonic);
     const secretKey = keyPair.secretKey;
     const publicKey = keyPair.publicKey;
 
-    const workchain = 0; // Genellikle workchain 0 kullanılır
+    const workchain = 0;
     const wallet = WalletContractV5R1.create({ workchain, publicKey });
     const address = wallet.address.toString({ urlSafe: true, bounceable: false, testOnly: false });
     const contract = client.open(wallet);
@@ -49,7 +48,6 @@ async function getUserJettonWalletAddress(userAddress: string, jettonMasterAddre
       neededInit = init;
     }
 
-    // Kullanıcının Jetton Wallet adresini al
     console.log('Jetton wallet adresi alınıyor...');
     const jettonWalletAddress = await getUserJettonWalletAddress(address, jettonContractAddress);
     console.log('Jetton wallet adresi:', jettonWalletAddress.toString());

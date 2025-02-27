@@ -1,4 +1,4 @@
-import { address, Address, toNano } from "@ton/ton";
+import { Address, toNano } from "@ton/ton";
 import { Vesting } from "../wrappers/Vesting";
 import { NetworkProvider } from '@ton/blueprint';
 import { CONTRACT_ADDRESS, JETTON_CONTRACT_WALLET_ADDRESS } from "../key";

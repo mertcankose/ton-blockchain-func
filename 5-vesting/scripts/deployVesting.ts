@@ -13,8 +13,8 @@ export async function run(provider: NetworkProvider) {
             Vesting.createFromConfig({
                 vesting_total_amount: toNano('0'), // 0 JETTON, when transfer jetton to contract increase this value
                 vesting_start_time: now, 
-                vesting_total_duration: 24 * 60 * 60, // 1 day
-                unlock_period: 60 * 60, // 1 hour
+                vesting_total_duration: 10 * 24 * 60 * 60, // 10 days
+                unlock_period: 24 * 60 * 60, // 1 day
                 cliff_duration: 0,
                 vesting_sender_address: provider.sender().address!,
                 owner_address: provider.sender().address!,
@@ -23,9 +23,7 @@ export async function run(provider: NetworkProvider) {
             }, 
             await compile('Vesting'))
         );
-
-        // Increased deployment amount to ensure enough TON for successful deployment
-        const DEPLOY_AMOUNT = toNano('0.05'); // Increased from 0.01 to 0.05
+        const DEPLOY_AMOUNT = toNano('0.01');
 
         console.log('Deploying contract...');
         console.log('Contract address:', vestingContract.address.toString());

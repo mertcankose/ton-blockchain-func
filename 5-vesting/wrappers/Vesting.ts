@@ -17,7 +17,6 @@ export const VestingOpcodes = {
   transfer_notification_internal: 0x7362d09c,
   excesses_internal: 0xd53276db,
   send_jettons: 0x7777,
-  receive_jetton: 0x9999,
 } as const;
 
 export type VestingConfig = {

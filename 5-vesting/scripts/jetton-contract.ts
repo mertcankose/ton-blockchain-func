@@ -14,10 +14,6 @@ export async function run(provider: NetworkProvider) {
         ]);
 
         const newJettonWalletAddress = response.stack.readAddress();
-
-        // JETTON WALLET ADDRESS
-        // EQCN8p6k3QOW7WFcec0XJbApdnk9oNWrRdaQyt1oidkixeSD
-
         console.log('newJettonWalletAddress: ', newJettonWalletAddress);
     } catch (error) {
         console.error('Error during get_wallet_address:', error);
