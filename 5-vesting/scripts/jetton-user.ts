@@ -4,7 +4,7 @@ import { API_KEY, JETTON_MASTER_ADDRESS } from '../key';
 
 export async function run(provider: NetworkProvider) {
     const jettonMasterAddress = JETTON_MASTER_ADDRESS;
-    const client = new TonClient({ endpoint: 'https://toncenter.com/api/v2/jsonRPC', apiKey: API_KEY });
+    const client = new TonClient({ endpoint: 'https://testnet.toncenter.com/api/v2/jsonRPC', apiKey: API_KEY });
 
     try {
         const userAddressCell = beginCell().storeAddress(provider.sender().address!).endCell();
