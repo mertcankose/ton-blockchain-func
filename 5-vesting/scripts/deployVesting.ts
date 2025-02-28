@@ -9,16 +9,27 @@ export async function run(provider: NetworkProvider) {
         const jettonMasterAddress = Address.parse(JETTON_MASTER_ADDRESS);
         const now = Math.floor(Date.now() / 1000);
 
+      
+        // wallet plugin
+
+        // auto-claim
+        // royalty fee - hard coded
+        // tek transactionda deploy + send jettons
+
+        // loglama contract
+        
+        // contract ile contract deploy et
+
         const vestingContract = provider.open(
             Vesting.createFromConfig({
-                vesting_total_amount: toNano('100'), // 0 JETTON, when transfer jetton to contract increase this value
+                vesting_total_amount: toNano('100'),
                 vesting_start_time: now, 
                 vesting_total_duration: 60 * 60, // 1 hour
                 unlock_period: 6 * 60, // 6 minutes
                 cliff_duration: 0,
                 vesting_sender_address: provider.sender().address!,
                 owner_address: provider.sender().address!,
-                seqno: 0,
+                seqno: 0, // extternal taşınacak
                 jetton_master_address: jettonMasterAddress,
             }, 
             await compile('Vesting'))
