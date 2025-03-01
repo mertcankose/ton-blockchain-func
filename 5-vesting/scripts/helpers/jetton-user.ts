@@ -1,6 +1,6 @@
 import { Address, beginCell, TonClient } from '@ton/ton';
 import { NetworkProvider } from '@ton/blueprint';
-import { API_KEY, JETTON_MASTER_ADDRESS } from '../key';
+import { API_KEY, JETTON_MASTER_ADDRESS } from '../../key';
 
 export async function run(provider: NetworkProvider) {
     const jettonMasterAddress = JETTON_MASTER_ADDRESS;

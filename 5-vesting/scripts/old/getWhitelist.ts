@@ -1,7 +1,7 @@
 import { Address } from "@ton/ton";
-import { Vesting } from "../wrappers/Vesting";
+import { Vesting } from "../../wrappers/Vesting";
 import { NetworkProvider } from '@ton/blueprint';
-import { CONTRACT_ADDRESS } from "../key";
+import { CONTRACT_ADDRESS } from "../../key";
 
 export async function run(provider: NetworkProvider) {
   const vestingContractAddress = Address.parse(CONTRACT_ADDRESS);
@@ -9,15 +9,15 @@ export async function run(provider: NetworkProvider) {
   const vestingContract = provider.open(Vesting.createFromAddress(vestingContractAddress));
 
   try {
-    const lockedAmount = await vestingContract.getLockedAmount(1745683656);
-    console.log("Locked Amount:", lockedAmount);
+    const whitelist = await vestingContract.getWhitelist();
+    console.log("Whitelist:", whitelist);
 
     return {
-      lockedAmount: lockedAmount
+      whitelist: whitelist
     };
 
   } catch (error) {
-    console.error("Error fetching locked amount:", error);
+    console.error("Error fetching whitelist:", error);
     throw error;
   }
 }

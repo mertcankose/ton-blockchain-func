@@ -1,7 +1,7 @@
-import { Address } from "@ton/ton";
-import { Vesting } from "../wrappers/Vesting";
+  import { Address } from "@ton/ton";
+  import { Vesting } from "../../wrappers/Vesting";
 import { NetworkProvider } from "@ton/blueprint";
-import { CONTRACT_ADDRESS, JETTON_CONTRACT_WALLET_ADDRESS } from "../key";
+import { CONTRACT_ADDRESS, JETTON_CONTRACT_WALLET_ADDRESS } from "../../key";
 
 export async function run(provider: NetworkProvider) {
   const vestingContractAddress = Address.parse(CONTRACT_ADDRESS);

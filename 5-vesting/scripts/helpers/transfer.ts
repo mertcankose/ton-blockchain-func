@@ -1,12 +1,12 @@
 import { beginCell, Address, TonClient, internal, external, storeMessage, toNano, WalletContractV5R1, SendMode } from '@ton/ton';
 import { mnemonicToPrivateKey } from '@ton/crypto';
-import { API_KEY, CONTRACT_ADDRESS, JETTON_MASTER_ADDRESS } from '../key';
+import { API_KEY } from '../../key';
 
 const apiKey = API_KEY;
-const client = new TonClient({ endpoint: 'https://toncenter.com/api/v2/jsonRPC', apiKey });
+const client = new TonClient({ endpoint: 'https://testnet.toncenter.com/api/v2/jsonRPC', apiKey });
 
-const jettonContractAddress = JETTON_MASTER_ADDRESS;
-const toAddress = CONTRACT_ADDRESS;
+const jettonContractAddress = "EQBQCVW3qnGKeBcumkLVD6x_K2nehE6xC5VsCyJZ02wvUKn4";
+const toAddress = "EQATig-URAt4b6oswMYHeLO9xXDeY-M1c4OkQXsgrLlCYcY9";
 
 const mnemonic = ['burger', 'sight', 'mother', 'song', 'arm', 'sheriff', 'ice', 'crater', 'purchase', 'mask', 'nurse', 'lock', 'mammal', 'various', 'arena', 'reveal', 'velvet', 'scan', 'control', 'student', 'whisper', 'eternal', 'remove', 'toe'];
 
@@ -28,7 +28,7 @@ async function getUserJettonWalletAddress(userAddress: string, jettonMasterAddre
 
     const workchain = 0;
     const wallet = WalletContractV5R1.create({ workchain, publicKey });
-    const address = wallet.address.toString({ urlSafe: true, bounceable: false, testOnly: false });
+    const address = wallet.address.toString({ urlSafe: true, bounceable: false, testOnly: true });
     const contract = client.open(wallet);
 
     console.log('Cüzdan adresi:', address);

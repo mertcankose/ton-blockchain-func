@@ -1,7 +1,7 @@
 import { Address } from "@ton/ton";
-import { Vesting } from "../wrappers/Vesting";
+import { Vesting } from "../../wrappers/Vesting";
 import { NetworkProvider } from '@ton/blueprint';
-import { CONTRACT_ADDRESS } from "../key";
+import { CONTRACT_ADDRESS } from "../../key";
 
 export async function run(provider: NetworkProvider) {
   const vestingContractAddress = Address.parse(CONTRACT_ADDRESS);
@@ -9,15 +9,15 @@ export async function run(provider: NetworkProvider) {
   const vestingContract = provider.open(Vesting.createFromAddress(vestingContractAddress));
 
   try {
-    const claimableAmount = await vestingContract.getClaimableAmount();
-    console.log("Claimable Amount:", claimableAmount);
+    const currentUnlockedAmount = await vestingContract.getCurrentUnlockedAmount();
+    console.log("Current Unlocked Amount:", currentUnlockedAmount);
 
     return {
-      claimableAmount: claimableAmount
+      currentUnlockedAmount: currentUnlockedAmount
     };
 
   } catch (error) {
-    console.error("Error fetching claimable amount:", error);
+    console.error("Error fetching current unlocked amount:", error);
     throw error;
   }
 }

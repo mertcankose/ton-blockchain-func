@@ -1,24 +1,13 @@
 import { toNano } from '@ton/core';
-import { Vesting } from '../wrappers/Vesting';
+import { Vesting } from '../../wrappers/Vesting';
 import { compile, NetworkProvider } from '@ton/blueprint';
 import { Address } from '@ton/core';
-import { JETTON_MASTER_ADDRESS } from '../key';
+import { JETTON_MASTER_ADDRESS } from '../../key';
 
 export async function run(provider: NetworkProvider) {
     try {
         const jettonMasterAddress = Address.parse(JETTON_MASTER_ADDRESS);
         const now = Math.floor(Date.now() / 1000);
-
-      
-        // wallet plugin
-
-        // auto-claim
-        // royalty fee - hard coded
-        // tek transactionda deploy + send jettons
-
-        // loglama contract
-        
-        // contract ile contract deploy et
 
         const vestingContract = provider.open(
             Vesting.createFromConfig({
