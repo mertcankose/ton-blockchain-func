@@ -3,8 +3,7 @@ import { Address, fromNano } from '@ton/core';
 import { VestingWallet } from '../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 
-// Vesting wallet adresi
-const WALLET_ADDRESS = "EQATig-URAt4b6oswMYHeLO9xXDeY-M1c4OkQXsgrLlCYcY9"; // ⚠️ Buraya token claim etmek istediğiniz vesting wallet adresini yazın
+const WALLET_ADDRESS = "EQCLej5yn2szQqUrjh-nAqMRoZLL2piPWY1J5Jndl_2fFCvO";
 
 export async function run(provider: NetworkProvider) {
   try {
@@ -41,8 +40,6 @@ export async function run(provider: NetworkProvider) {
     );
     
     console.log('Claim transaction sent successfully!');
-    // @ts-ignore
-    console.log('Transaction ID:', result.transactions[0].id);
     console.log(`Claimed amount: ${fromNano(claimableAmount)} tokens`);
     
     // Remaining claim kontrolü
@@ -58,8 +55,6 @@ export async function run(provider: NetworkProvider) {
     return {
       success: true,
       amount: fromNano(claimableAmount),
-      // @ts-ignore
-      txid: result.transactions[0].id
     };
   } catch (error) {
     console.error('Error claiming tokens:', error);

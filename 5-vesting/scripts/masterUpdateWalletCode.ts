@@ -4,7 +4,7 @@ import { VestingMaster } from '../wrappers/VestingMaster';
 import { compile, NetworkProvider } from '@ton/blueprint';
 
 // Master kontrat adresi
-const MASTER_CONTRACT_ADDRESS = "EQBN0iwDeFnGfaaFlt_A66ppcZDQzwmxJS5Ft5kwUQSbHdsp"; // ⚠️ Buraya gerçek master kontrat adresinizi yazın
+const MASTER_CONTRACT_ADDRESS = "EQA-EpakmTO_KBPX_NrSY88qS7vqdWKChc-VMtFK0CnSPUwr"; // ⚠️ Buraya gerçek master kontrat adresinizi yazın
 
 // Yeni wallet kodu yolu (contracts/ içindeki dosya adı)
 const NEW_WALLET_CODE_PATH = "VestingWallet"; // ⚠️ Yeni wallet kodu için contracts/ içindeki dosya adı

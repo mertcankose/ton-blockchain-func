@@ -3,14 +3,11 @@ import { Address, toNano, fromNano } from '@ton/core';
 import { VestingWallet } from '../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 
-// Vesting wallet adresi
-const WALLET_ADDRESS = "EQATig-URAt4b6oswMYHeLO9xXDeY-M1c4OkQXsgrLlCYcY9"; // ⚠️ Buraya token göndermek istediğiniz vesting wallet adresini yazın
+const WALLET_ADDRESS = "EQCLej5yn2szQqUrjh-nAqMRoZLL2piPWY1J5Jndl_2fFCvO";
 
-// Token göndermek istediğiniz adres
-const RECIPIENT_ADDRESS = "0QARfBT9PMJ_TjX8bUqFvI-ZMqixM7kY68_-7tmVm-khfOyj"; // ⚠️ Buraya tokenleri göndermek istediğiniz adresi yazın
+const RECIPIENT_ADDRESS = "0QARfBT9PMJ_TjX8bUqFvI-ZMqixM7kY68_-7tmVm-khfOyj";
 
-// Göndermek istediğiniz token miktarı
-const TOKEN_AMOUNT = "10"; // ⚠️ Buraya göndermek istediğiniz token miktarını yazın (TON biriminde)
+const TOKEN_AMOUNT = "10";
 
 export async function run(provider: NetworkProvider) {
   try {
@@ -46,7 +43,7 @@ export async function run(provider: NetworkProvider) {
     }
     
     // Transfer işlemini gerçekleştir
-    const forwardAmount = toNano('0.01'); // 0.01 TON for recipient
+    const forwardAmount = toNano('1'); // 0.01 TON for recipient
     const result = await vestingWallet.sendJettons(provider.sender(), {
       toAddress: recipientAddress,
       jettonAmount: amount,
@@ -55,16 +52,12 @@ export async function run(provider: NetworkProvider) {
     });
     
     console.log('Token transfer transaction sent successfully!');
-    // @ts-ignore
-    console.log('Transaction ID:', result.transactions[0].id);
     
     return {
       success: true,
       from: walletAddress.toString(),
       to: recipientAddress.toString(),
       amount: TOKEN_AMOUNT,
-      // @ts-ignore
-      txid: result.transactions[0].id
     };
   } catch (error) {
     console.error('Error sending tokens:', error);

@@ -3,8 +3,7 @@ import { Address, fromNano } from '@ton/core';
 import { VestingWallet } from '../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 
-// Vesting wallet adresi
-const WALLET_ADDRESS = "EQATig-URAt4b6oswMYHeLO9xXDeY-M1c4OkQXsgrLlCYcY9"; // ⚠️ Buraya bilgilerini almak istediğiniz vesting wallet adresini yazın
+const WALLET_ADDRESS = "EQCLej5yn2szQqUrjh-nAqMRoZLL2piPWY1J5Jndl_2fFCvO";
 
 // Tarih formatı
 function formatDate(timestamp: number): string {
@@ -46,8 +45,6 @@ export async function run(provider: NetworkProvider) {
     console.log("claimedAmount", claimedAmount);
     const claimableAmount = await vestingWallet.getClaimableAmount();
     console.log("claimableAmount", claimableAmount);
-    const seqno = await vestingWallet.getSeqno();
-    console.log("seqno", seqno);
     
     // Jetton wallet adresini al
     let jettonWalletAddress;
@@ -67,8 +64,7 @@ export async function run(provider: NetworkProvider) {
     } else {
       console.log('Jetton Wallet:', jettonWalletAddress);
     }
-    
-    console.log('Sequence Number:', seqno);
+  
     
     console.log('\n--- Vesting Schedule ---');
     console.log('Start Time:', formatDate(vestingData.vestingStartTime));
@@ -98,11 +94,11 @@ export async function run(provider: NetworkProvider) {
         address: walletAddress.toString(),
         owner: owner.toString(),
         jettonMaster: vestingData.jettonMasterAddress.toString(),
+        totalAmount: fromNano(vestingData.vestingTotalAmount),
         startTime: vestingData.vestingStartTime,
         totalDuration: vestingData.vestingTotalDuration,
         unlockPeriod: vestingData.unlockPeriod,
         cliffDuration: vestingData.cliffDuration,
-        totalAmount: fromNano(vestingData.vestingTotalAmount),
         locked: fromNano(currentLocked),
         unlocked: fromNano(currentUnlocked),
         claimed: fromNano(claimedAmount),

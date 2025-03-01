@@ -63,12 +63,13 @@ slice calculate_vesting_wallet_address(cell state_init) inline {
         .begin_parse();
 }
 
-cell create_vesting_wallet_state_init(slice owner_address, slice jetton_master_address, int vesting_params, cell wallet_code) inline {
+cell create_vesting_wallet_state_init(slice owner_address, slice jetton_master_address, int vesting_total_amount, int vesting_params, cell wallet_code) inline {
+
     cell data = begin_cell()
         .store_slice(owner_address) 
         .store_slice(jetton_master_address)
+        .store_coins(vesting_total_amount)
         .store_uint(vesting_params, 128)
-        .store_uint(0, 64) ;; Initial seqno
         .store_coins(0) ;; Initial claimed amount
         .store_dict(new_dict()) ;; Initial whitelist
         .end_cell();
@@ -110,7 +111,9 @@ cell create_vesting_wallet_state_init(slice owner_address, slice jetton_master_a
         
         slice vesting_owner = in_msg_body~load_msg_addr();
         slice jetton_master = in_msg_body~load_msg_addr();
-    
+        
+        ;; Load vesting total amount - NEW PARAMETER
+        int vesting_total_amount = in_msg_body~load_coins();
         
         ;; Load vesting parameters
         int vesting_start_time = in_msg_body~load_uint(32);
@@ -128,7 +131,8 @@ cell create_vesting_wallet_state_init(slice owner_address, slice jetton_master_a
         cell state_init = create_vesting_wallet_state_init(
             vesting_owner, 
             jetton_master, 
-            packed_params, 
+            vesting_total_amount,
+            packed_params,
             vesting_wallet_code
         );
         
@@ -170,7 +174,7 @@ cell create_vesting_wallet_state_init(slice owner_address, slice jetton_master_a
         var addr_msg = begin_cell()
             .store_uint(0x18, 6)
             .store_slice(sender_addr)
-            .store_coins(0)
+            .store_coins(10000000)
             .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
             .store_uint(op::take_wallet_address, 32)
             .store_uint(query_id, 64)
@@ -185,25 +189,26 @@ cell create_vesting_wallet_state_init(slice owner_address, slice jetton_master_a
     if (op == op::provide_wallet_address) {
         slice owner_addr = in_msg_body~load_msg_addr();
         slice jetton_master = in_msg_body~load_msg_addr();
+        int vesting_total_amount = in_msg_body~load_coins();
         int include_state_init = in_msg_body~load_uint(1);
         
         ;; Load vesting parameters or use defaults
-        int vesting_start_time = in_msg_body.slice_bits() >= 32 ? in_msg_body~load_uint(32) : (now() + 3600);
-        int vesting_total_duration = in_msg_body.slice_bits() >= 32 ? in_msg_body~load_uint(32) : (30 * 86400);
-        int unlock_period = in_msg_body.slice_bits() >= 32 ? in_msg_body~load_uint(32) : 86400;
-        int cliff_duration = in_msg_body.slice_bits() >= 32 ? in_msg_body~load_uint(32) : (7 * 86400);
+        int vesting_start_time = in_msg_body~load_uint(32);
+        int vesting_total_duration = in_msg_body~load_uint(32);
+        int unlock_period = in_msg_body~load_uint(32);
+        int cliff_duration = in_msg_body~load_uint(32);
         
         ;; Pack vesting parameters for compact storage
         int packed_params = (vesting_start_time << 96) | 
         (vesting_total_duration << 64) | 
-        (unlock_period << 32) | 
-                           cliff_duration;
+        (unlock_period << 32) | cliff_duration;
         
         ;; Create state init for the vesting wallet
         cell state_init = create_vesting_wallet_state_init(
             owner_addr, 
             jetton_master, 
-            packed_params, 
+            vesting_total_amount,
+            packed_params,
             vesting_wallet_code
         );
         
@@ -292,7 +297,7 @@ cell get_wallet_code() method_id {
 
 ;; Returns vesting wallet address for a given owner and parameters
 slice get_wallet_address(slice owner_address, slice jetton_master_address, 
-    int vesting_start_time, int vesting_total_duration, 
+    int vesting_total_amount, int vesting_start_time, int vesting_total_duration, 
     int unlock_period, int cliff_duration) method_id {
     var (_, vesting_wallet_code, _, _) = load_data();
     
@@ -306,6 +311,7 @@ slice get_wallet_address(slice owner_address, slice jetton_master_address,
     cell state_init = create_vesting_wallet_state_init(
         owner_address,
         jetton_master_address,
+        vesting_total_amount,
         packed_params,
         vesting_wallet_code
     );

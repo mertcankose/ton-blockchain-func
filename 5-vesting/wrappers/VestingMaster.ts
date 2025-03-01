@@ -100,11 +100,12 @@ export class VestingMaster implements Contract {
     opts: {
       owner: Address;
       jettonMaster: Address;
+      vestingTotalAmount: bigint;
       includeStateInit: boolean;
-      startTime?: number;
-      totalDuration?: number;
-      unlockPeriod?: number;
-      cliffDuration?: number;
+      startTime: number;
+      totalDuration: number;
+      unlockPeriod: number;
+      cliffDuration: number;
     }
   ) {
     const queryId = BigInt(Math.floor(Math.random() * 10000000000));
@@ -114,26 +115,18 @@ export class VestingMaster implements Contract {
       .storeUint(queryId, 64)
       .storeAddress(opts.owner)
       .storeAddress(opts.jettonMaster)
-      .storeBit(opts.includeStateInit);
-
-    // Add optional vesting parameters if provided
-    if (opts.startTime !== undefined) {
-      msgBody.storeUint(opts.startTime, 32);
-    }
-    if (opts.totalDuration !== undefined) {
-      msgBody.storeUint(opts.totalDuration, 32);
-    }
-    if (opts.unlockPeriod !== undefined) {
-      msgBody.storeUint(opts.unlockPeriod, 32);
-    }
-    if (opts.cliffDuration !== undefined) {
-      msgBody.storeUint(opts.cliffDuration, 32);
-    }
+      .storeCoins(opts.vestingTotalAmount)
+      .storeBit(opts.includeStateInit)
+      .storeUint(opts.startTime, 32)
+      .storeUint(opts.totalDuration, 32)
+      .storeUint(opts.unlockPeriod, 32)
+      .storeUint(opts.cliffDuration, 32)
+      .endCell()
 
     return await provider.internal(via, {
       value: toNano("0.05"),
       sendMode: SendMode.PAY_GAS_SEPARATELY,
-      body: msgBody.endCell(),
+      body: msgBody
     });
   }
 
@@ -193,8 +186,6 @@ export class VestingMaster implements Contract {
         .endCell(),
     });
   }
-
-  // Get methods
   
   // Get royalty fee
   async getRoyaltyFee(provider: ContractProvider) {
@@ -223,11 +214,12 @@ export class VestingMaster implements Contract {
     };
   }
 
-  // Get wallet address for params
+  // Get wallet address for params - Updated to include vestingTotalAmount
   async getWalletAddress(
     provider: ContractProvider,
     owner: Address,
     jettonMaster: Address,
+    vestingTotalAmount: bigint,
     startTime: number,
     totalDuration: number,
     unlockPeriod: number,
@@ -236,6 +228,7 @@ export class VestingMaster implements Contract {
     const result = await provider.get("get_wallet_address", [
       { type: "slice", cell: beginCell().storeAddress(owner).endCell() },
       { type: "slice", cell: beginCell().storeAddress(jettonMaster).endCell() },
+      { type: "int", value: BigInt(vestingTotalAmount) },
       { type: "int", value: BigInt(startTime) },
       { type: "int", value: BigInt(totalDuration) },
       { type: "int", value: BigInt(unlockPeriod) },

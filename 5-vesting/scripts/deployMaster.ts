@@ -32,6 +32,7 @@ export async function run(provider: NetworkProvider) {
     // Wait for deploy transaction to complete
     console.log('Waiting for deploy transaction...');
     await provider.waitForDeploy(vestingMaster.address);
+    console.log('Deploy transaction completed successfully.');
   
     // Verify stats
     try {
@@ -48,7 +49,7 @@ export async function run(provider: NetworkProvider) {
     } catch (e) {
       console.log('Vesting Master deployed successfully!');
       console.log('Contract address:', vestingMaster.address.toString());
-      console.log('Could not verify contract stats after deploy.');
+      console.log('Could not verify contract stats after deploy: ', e);
     }
 
     console.log('\nNext steps:');

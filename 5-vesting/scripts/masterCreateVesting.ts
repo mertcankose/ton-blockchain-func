@@ -5,7 +5,7 @@ import { NetworkProvider } from "@ton/blueprint";
 
 // Master kontrat adresi
 const MASTER_CONTRACT_ADDRESS =
-  "EQCGHiDZINW306D49N-C2bPfRvw7Upje6i8msb-6r9GEjlJZ"; // ⚠️ Buraya gerçek master kontrat adresinizi yazın
+  "EQA-EpakmTO_KBPX_NrSY88qS7vqdWKChc-VMtFK0CnSPUwr"; // ⚠️ Buraya gerçek master kontrat adresinizi yazın
 
 // Jetton master adresi
 const JETTON_MASTER_ADDRESS =
@@ -40,16 +40,14 @@ export async function run(provider: NetworkProvider) {
       VestingMaster.createFromAddress(masterAddress)
     );
 
-    // Jetton master adresini parse et
     const jettonMaster = Address.parse(JETTON_MASTER_ADDRESS);
 
-    // Royalty fee miktarını al
     const royaltyFee = await vestingMaster.getRoyaltyFee();
 
     console.log("Royalty fee:", fromNano(royaltyFee), "TON");
 
-    // Vesting parametrelerini hazırla
     const now = Math.floor(Date.now() / 1000);
+    const vestingTotalAmount = toNano("100");
     const startTime = now + CUSTOM_PARAMS.START_DELAY;
     const totalDuration = CUSTOM_PARAMS.TOTAL_DURATION;
     const unlockPeriod = CUSTOM_PARAMS.UNLOCK_PERIOD;
@@ -59,6 +57,7 @@ export async function run(provider: NetworkProvider) {
     const walletAddress = await vestingMaster.getWalletAddress(
       provider.sender().address!,
       jettonMaster,
+      vestingTotalAmount,
       startTime,
       totalDuration,
       unlockPeriod,
@@ -70,6 +69,7 @@ export async function run(provider: NetworkProvider) {
     );
     console.log("- Owner:", provider.sender().address!.toString());
     console.log("- Jetton Master:", jettonMaster.toString());
+    console.log("- Vesting Total Amount:", fromNano(vestingTotalAmount), "tokens");
     console.log("- Start Time:", formatDate(startTime));
     console.log("- Total Duration:", formatDuration(totalDuration));
     console.log("- Unlock Period:", formatDuration(unlockPeriod));
@@ -90,7 +90,7 @@ export async function run(provider: NetworkProvider) {
         queryId: 0n,
         owner: provider.sender().address!,
         jettonMaster: jettonMaster,
-        vestingTotalAmount: toNano("100000000000"), // 100  
+        vestingTotalAmount: vestingTotalAmount,
         startTime: startTime,
         totalDuration: totalDuration,
         unlockPeriod: unlockPeriod,

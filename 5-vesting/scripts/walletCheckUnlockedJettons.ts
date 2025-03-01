@@ -3,8 +3,7 @@ import { Address, fromNano } from '@ton/core';
 import { VestingWallet } from '../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 
-// Vesting wallet adresi
-const WALLET_ADDRESS = "EQCghJk4W6w72SJinDbNi1_kQxCUUc9RjBhsQFA2SHb6Z4z5"; // ⚠️ Buraya kontrol etmek istediğiniz vesting wallet adresini yazın
+const WALLET_ADDRESS = "EQCLej5yn2szQqUrjh-nAqMRoZLL2piPWY1J5Jndl_2fFCvO";
 
 // Tarih formatı
 function formatDate(timestamp: number): string {
@@ -48,9 +47,9 @@ export async function run(provider: NetworkProvider) {
     const progress = Math.min(100, (timeElapsed / vestingData.vestingTotalDuration) * 100);
     
     // Token oranlarını hesapla
-    const unlockedPercent = totalAmount > 0 ? (Number(currentUnlocked) * 100) / totalAmount : 0;
-    const lockedPercent = totalAmount > 0 ? (Number(currentLocked) * 100) / totalAmount : 0;
-    const claimedPercent = totalAmount > 0 ? (Number(claimedAmount) * 100) / totalAmount : 0;
+    const unlockedPercent = totalAmount > 0n ? (Number(fromNano(currentUnlocked)) * 100) / Number(fromNano(totalAmount)) : 0;
+    const lockedPercent = totalAmount > 0n ? (Number(fromNano(currentLocked)) * 100) / Number(fromNano(totalAmount)) : 0;
+    const claimedPercent = totalAmount > 0n ? (Number(fromNano(claimedAmount)) * 100) / Number(fromNano(totalAmount)) : 0;
     
     console.log('\n===== VESTING PROGRESS =====');
     console.log('Start Time:', formatDate(startTime));

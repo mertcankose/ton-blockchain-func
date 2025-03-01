@@ -3,11 +3,9 @@ import { Address } from '@ton/core';
 import { VestingWallet } from '../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 
-// Vesting wallet adresi
-const WALLET_ADDRESS = "EQCghJk4W6w72SJinDbNi1_kQxCUUc9RjBhsQFA2SHb6Z4z5"; // ⚠️ Buraya whitelist eklemek istediğiniz vesting wallet adresini yazın
+const WALLET_ADDRESS = "EQCLej5yn2szQqUrjh-nAqMRoZLL2piPWY1J5Jndl_2fFCvO";
 
-// Whitelist'e eklemek istediğiniz adres
-const ADDRESS_TO_ADD = "0QARfBT9PMJ_TjX8bUqFvI-ZMqixM7kY68_-7tmVm-khfOyj"; // ⚠️ Buraya whitelist'e eklemek istediğiniz adresi yazın
+const ADDRESS_TO_ADD = "0QARfBT9PMJ_TjX8bUqFvI-ZMqixM7kY68_-7tmVm-khfOyj";
 
 export async function run(provider: NetworkProvider) {
   try {
@@ -43,15 +41,13 @@ export async function run(provider: NetworkProvider) {
     );
     
     console.log('Address added to whitelist successfully!');
-    // @ts-ignore
-    console.log('Transaction ID:', result.transactions[0].id);
+
     
     return {
       success: true,
       wallet: walletAddress.toString(),
       address: addressToAdd.toString(),
-      // @ts-ignore
-      txid: result.transactions[0].id
+
     };
   } catch (error) {
     console.error('Error adding to whitelist:', error);
