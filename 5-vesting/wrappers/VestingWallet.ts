@@ -153,7 +153,6 @@ export class VestingWallet implements Contract {
     });
   }
 
-  // Send jettons from vesting wallet to recipient
   async sendJettons(
     provider: ContractProvider,
     via: Sender,
@@ -161,51 +160,45 @@ export class VestingWallet implements Contract {
       toAddress: Address;
       jettonAmount: bigint;
       forwardTonAmount: bigint;
-      jettonWalletAddress?: Address;
+      jettonWalletAddress: Address;
     }
   ) {
-    const queryId = BigInt(Math.floor(Math.random() * 10000000000));
-    const value = opts.forwardTonAmount + toNano("0.05"); // Forward amount + gas
-
-    const msgBody = beginCell()
-      .storeUint(VestingWalletOpcodes.send_jettons, 32)
-      .storeUint(queryId, 64)
-      .storeAddress(opts.toAddress)
-      .storeCoins(opts.jettonAmount)
-      .storeCoins(opts.forwardTonAmount);
-
-    // Add jetton wallet address if provided
-    if (opts.jettonWalletAddress) {
-      msgBody.storeAddress(opts.jettonWalletAddress);
-    }
+    const queryId = 2n;
+    const value = opts.forwardTonAmount + toNano("0.05");
 
     return await provider.internal(via, {
       value,
       sendMode: SendMode.PAY_GAS_SEPARATELY,
-      body: msgBody.endCell(),
+      body: beginCell()
+      .storeUint(VestingWalletOpcodes.send_jettons, 32)
+      .storeUint(queryId, 64)
+      .storeAddress(opts.toAddress)
+      .storeCoins(opts.jettonAmount)
+      .storeCoins(opts.forwardTonAmount)
+      .storeAddress(opts.jettonWalletAddress)
+      .endCell(),
     });
   }
 
-  // Claim unlocked tokens
-  async claimUnlocked(
-    provider: ContractProvider,
-    via: Sender,
-    jettonWalletAddress?: Address
-  ) {
-    const queryId = BigInt(Math.floor(Math.random() * 10000000000));
-    const msgBody = beginCell()
-      .storeUint(VestingWalletOpcodes.claim_unlocked, 32)
-      .storeUint(queryId, 64);
-
-    // Add jetton wallet address if provided
-    if (jettonWalletAddress) {
-      msgBody.storeAddress(jettonWalletAddress);
+  async claimUnlocked(provider: ContractProvider, via: Sender,
+    opts: {
+      forwardTonAmount: bigint,
+      jettonWalletAddress: Address,
     }
+  ) {
+    const queryId = 1n
+
+    const value = opts.forwardTonAmount + toNano("0.05");
 
     return await provider.internal(via, {
-      value: toNano("0.05"),
+      value,
       sendMode: SendMode.PAY_GAS_SEPARATELY,
-      body: msgBody.endCell(),
+      body: beginCell()
+      .storeUint(VestingWalletOpcodes.claim_unlocked, 32)
+      .storeUint(queryId, 64)
+      .storeCoins(opts.forwardTonAmount)
+      .storeAddress(opts.jettonWalletAddress)
+      .endCell(),
     });
   }
 
@@ -241,7 +234,7 @@ export class VestingWallet implements Contract {
       unlockPeriod: result.stack.readNumber(),
       cliffDuration: result.stack.readNumber(),
       claimedAmount: result.stack.readBigNumber(),
-      whitelist: result.stack.readCell(),
+      // whitelist: result.stack.readCell(),
     };
   }
 

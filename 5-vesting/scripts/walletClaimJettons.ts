@@ -1,9 +1,8 @@
-// scripts/claim-tokens.ts
-import { Address, fromNano } from '@ton/core';
+import { Address, fromNano, toNano } from '@ton/core';
 import { VestingWallet } from '../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 
-const WALLET_ADDRESS = "EQCLej5yn2szQqUrjh-nAqMRoZLL2piPWY1J5Jndl_2fFCvO";
+const WALLET_ADDRESS = "EQCiSBcd0CTIaw4crOY_0jJ6VIVUYdpjVX8Wdd8M8jVw8HX7";
 
 export async function run(provider: NetworkProvider) {
   try {
@@ -23,20 +22,17 @@ export async function run(provider: NetworkProvider) {
     
     console.log(`\nClaiming ${fromNano(claimableAmount)} unlocked tokens...`);
     
-    // Jetton wallet adresini al (varsa)
-    let jettonWalletAddress;
-    try {
-      jettonWalletAddress = await vestingWallet.getJettonWalletAddress();
-      console.log('Found jetton wallet address:', jettonWalletAddress.toString());
-    } catch (e) {
-      console.log('Could not retrieve jetton wallet address, proceeding without it...');
-    }
     
-    // Claim işlemini gerçekleştir
+    let jettonWalletAddress = Address.parse("EQBuor-j5UJTYxyPO7d3mHXdoJSK-8XrszCxmym3cfw2WFMu");
+    
+    const forwardTonAmount = toNano('0.5');
     const result = await vestingWallet.claimUnlocked(
       provider.provider(walletAddress),
       provider.sender(),
-      jettonWalletAddress
+      {
+        forwardTonAmount,
+        jettonWalletAddress
+      }
     );
     
     console.log('Claim transaction sent successfully!');

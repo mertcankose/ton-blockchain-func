@@ -3,11 +3,9 @@ import { Address } from '@ton/core';
 import { VestingMaster } from '../wrappers/VestingMaster';
 import { NetworkProvider } from '@ton/blueprint';
 
-// Master kontrat adresi
-const MASTER_CONTRACT_ADDRESS = "EQA-EpakmTO_KBPX_NrSY88qS7vqdWKChc-VMtFK0CnSPUwr"; // ⚠️ Buraya gerçek master kontrat adresinizi yazın
+const MASTER_CONTRACT_ADDRESS = "EQAOLJnZaOfOwnsYj18bujPzbsTdWgQdF-FTXkUKT-N-5uci";
 
-// Yeni owner adresi
-const NEW_OWNER_ADDRESS = "0QARfBT9PMJ_TjX8bUqFvI-ZMqixM7kY68_-7tmVm-khfOyj"; // ⚠️ Buraya yeni owner adresini yazın
+const NEW_OWNER_ADDRESS = "0QARfBT9PMJ_TjX8bUqFvI-ZMqixM7kY68_-7tmVm-khfOyj";
 
 export async function run(provider: NetworkProvider) {
   try {

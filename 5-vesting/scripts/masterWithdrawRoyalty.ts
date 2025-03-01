@@ -3,8 +3,7 @@ import { Address, toNano, fromNano } from '@ton/core';
 import { VestingMaster } from '../wrappers/VestingMaster';
 import { NetworkProvider } from '@ton/blueprint';
 
-// Master kontrat adresi
-const MASTER_CONTRACT_ADDRESS = "EQA-EpakmTO_KBPX_NrSY88qS7vqdWKChc-VMtFK0CnSPUwr"; // ⚠️ Buraya gerçek master kontrat adresinizi yazın
+const MASTER_CONTRACT_ADDRESS = "EQAOLJnZaOfOwnsYj18bujPzbsTdWgQdF-FTXkUKT-N-5uci";
 
 // Çekilecek miktar (TON biriminde, boş bırakılırsa tüm bakiye çekilir)
 const WITHDRAW_AMOUNT = ""; // ⚠️ Çekmek istediğiniz miktar (örn: "0.5" veya boş bırakın)

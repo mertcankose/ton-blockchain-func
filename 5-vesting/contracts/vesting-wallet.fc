@@ -129,32 +129,6 @@ int equal_slices(slice a, slice b) {
     );
 }
 
-;; Calculate jetton wallet address for a given owner and jetton master
-slice calculate_user_jetton_wallet_address(slice owner_address, slice jetton_master_address) inline {
-    ;; This is a simplified version - actual implementation should match your jetton standard
-    int workchain = 0; ;; Usually same workchain as owner address
-    
-    ;; Create data cell for the jetton wallet
-    cell data = begin_cell()
-        .store_slice(owner_address)
-        .store_slice(jetton_master_address)
-        .store_coins(0) ;; Balance
-        .store_uint(0, 1) ;; No jetton wallet code in data (code stored in code field of state init)
-        .end_cell();
-    
-    ;; Get wallet code from jetton master (in real implementation)
-    ;; In this simplified version, we'll generate an address based on owner and master hash
-    int addr_hash = cell_hash(data);
-    
-    ;; Return an address in the correct format
-    return begin_cell()
-        .store_uint(4, 3)
-        .store_int(workchain, 8)
-        .store_uint(addr_hash, 256)
-        .end_cell()
-        .begin_parse();
-}
-
 ;; Calculate unlocked amount at a specific time
 int calculate_unlocked_amount(int vesting_total_amount, int vesting_start_time, int vesting_total_duration, 
     int unlock_period, int cliff_duration, int at_time) inline {
@@ -260,7 +234,7 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
             unlock_period, cliff_duration, claimed_amount, whitelist);
         return ();
     }
-  
+    
     if (op == op::excesses) {
         return (); ;; Ignore excesses notifications
     }
@@ -269,14 +243,8 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
         ;; Only owner can claim unlocked tokens
         throw_unless(error::not_owner, equal_slices(sender_addr, owner_address));
         
-        ;; Get jetton wallet address from message or calculate it
-        slice jetton_wallet_address = null();
-        if (in_msg_body.slice_bits() >= 267) {
-            jetton_wallet_address = in_msg_body~load_msg_addr();
-        } else {
-            ;; Calculate jetton wallet address using standard algorithm
-            jetton_wallet_address = calculate_user_jetton_wallet_address(owner_address, jetton_master_address);
-        }
+        int forward_ton_amount = in_msg_body~load_coins();
+        slice jetton_wallet_address = in_msg_body~load_msg_addr();
     
         int unlocked_amount = calculate_unlocked_amount(vesting_total_amount, vesting_start_time, 
             vesting_total_duration, unlock_period, cliff_duration, now());
@@ -289,7 +257,7 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
         var msg = begin_cell()
           .store_uint(0x18, 6)
           .store_slice(jetton_wallet_address)
-          .store_coins(gas::jetton_transfer) ;; gas
+          .store_coins(forward_ton_amount + gas::jetton_transfer) ;; gas
           .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
           .store_ref(
             begin_cell()
@@ -299,7 +267,7 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
               .store_slice(owner_address)
               .store_slice(owner_address) ;; response destination
               .store_uint(0, 1) ;; No custom payload
-              .store_coins(50000000) ;; Forward ton amount 0.05
+              .store_coins(forward_ton_amount) ;; Forward ton amount 0.05
               .store_uint(0, 1) ;; No forward payload
             .end_cell()
         );
@@ -320,14 +288,7 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
         slice to_addr = in_msg_body~load_msg_addr();
         int jetton_amount = in_msg_body~load_coins();
         int forward_ton_amount = in_msg_body~load_coins();
-        
-        ;; Get or calculate jetton wallet address
-        slice jetton_wallet_address = null();
-        if (in_msg_body.slice_bits() >= 267) {
-            jetton_wallet_address = in_msg_body~load_msg_addr();
-        } else {
-            jetton_wallet_address = calculate_user_jetton_wallet_address(owner_address, jetton_master_address);
-        }
+        slice jetton_wallet_address = in_msg_body~load_msg_addr();
 
         ;; Calculate locked amount
         int locked_amount = calculate_locked_amount(vesting_total_amount, vesting_start_time, 
@@ -362,8 +323,6 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
     ;; Unknown operation
     throw(error::invalid_op);
 }
-
-;; Get methods
 
 ;; Get vesting parameters
 (slice, slice, int, int, int, int, int, int, cell) get_vesting_data() method_id {
@@ -447,12 +406,6 @@ tuple get_whitelist() method_id {
     } until (~ found);
     
     return list;
-}
-
-;; Get jetton wallet address for this vesting contract
-slice get_jetton_wallet_address() method_id {
-    var (owner_address, jetton_master_address, _, _, _, _, _, _, _) = load_data();
-    return calculate_user_jetton_wallet_address(owner_address, jetton_master_address);
 }
 
 ;; Get vesting total amount directly
