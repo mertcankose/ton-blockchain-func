@@ -18,6 +18,7 @@ export const VestingMasterOpcodes = {
   update_wallet_code: 0x1234,
   change_owner: 0x2345,
   withdraw_tons: 0x3456,
+  set_logger_address: 0x4567, // Eklenen opcode
 } as const;
 
 export type VestingMasterConfig = {
@@ -29,12 +30,17 @@ export type VestingMasterConfig = {
 };
 
 export function vestingMasterConfigToCell(config: VestingMasterConfig): Cell {
-  return beginCell()
-    .storeAddress(config.owner_address)
+  // Yeni hücre yapısı: owner_address + ref[vesting_wallet_code + diğer veriler]
+  const extraData = beginCell()
     .storeRef(config.vesting_wallet_code)
     .storeAddress(config.logger_address)
     .storeUint(config.total_wallets_created, 64)
     .storeCoins(config.total_royalty_collected)
+    .endCell();
+    
+  return beginCell()
+    .storeAddress(config.owner_address)
+    .storeRef(extraData)
     .endCell();
 }
 
@@ -154,6 +160,25 @@ export class VestingMaster implements Contract {
     });
   }
 
+  // Logger adresini güncelle
+  async sendSetLoggerAddress(
+    provider: ContractProvider,
+    via: Sender,
+    newLoggerAddress: Address
+  ) {
+    const queryId = BigInt(Math.floor(Math.random() * 10000000000));
+
+    return await provider.internal(via, {
+      value: toNano("0.05"),
+      sendMode: SendMode.PAY_GAS_SEPARATELY,
+      body: beginCell()
+        .storeUint(VestingMasterOpcodes.set_logger_address, 32)
+        .storeUint(queryId, 64)
+        .storeAddress(newLoggerAddress)
+        .endCell(),
+    });
+  }
+
   // Update wallet code (owner only)
   async sendUpdateWalletCode(
     provider: ContractProvider,
@@ -247,7 +272,7 @@ export class VestingMaster implements Contract {
   async getWalletAddress(
     provider: ContractProvider,
     owner: Address,
-    recipient: Address, // Added recipient parameter
+    recipient: Address,
     jettonMaster: Address,
     vestingTotalAmount: bigint,
     startTime: number,

@@ -2,7 +2,7 @@ import { Address, fromNano, toNano } from '@ton/core';
 import { VestingWallet } from '../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 
-const WALLET_ADDRESS = "EQCiSBcd0CTIaw4crOY_0jJ6VIVUYdpjVX8Wdd8M8jVw8HX7";
+const WALLET_ADDRESS = "EQAgFFbyxbVkh_j3ERptIxfqiL92RdSGQJ0WNPrwodwHeaUk";
 
 export async function run(provider: NetworkProvider) {
   try {

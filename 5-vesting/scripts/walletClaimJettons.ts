@@ -2,7 +2,7 @@ import { Address, fromNano, toNano } from '@ton/core';
 import { VestingWallet } from '../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 
-const WALLET_ADDRESS = "EQCiSBcd0CTIaw4crOY_0jJ6VIVUYdpjVX8Wdd8M8jVw8HX7";
+const WALLET_ADDRESS = "EQAgFFbyxbVkh_j3ERptIxfqiL92RdSGQJ0WNPrwodwHeaUk";
 
 export async function run(provider: NetworkProvider) {
   try {
@@ -23,7 +23,7 @@ export async function run(provider: NetworkProvider) {
     console.log(`\nClaiming ${fromNano(claimableAmount)} unlocked tokens...`);
     
     
-    let jettonWalletAddress = Address.parse("EQBuor-j5UJTYxyPO7d3mHXdoJSK-8XrszCxmym3cfw2WFMu");
+    let jettonWalletAddress = Address.parse("EQAxRhj44YvQRXhatFc1vpJy2OS9i0Y_v0RJVp8BQ5KrPAcc");
     
     const forwardTonAmount = toNano('0.5');
     const result = await vestingWallet.claimUnlocked(

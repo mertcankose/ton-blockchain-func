@@ -1,11 +1,10 @@
-// scripts/deploy-master.ts
 import { toNano, fromNano, Address } from '@ton/core';
 import { VestingMaster } from '../wrappers/VestingMaster';
 import { compile, NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
   try {
-
+    // Logger adresi (varsa)
     const loggerAddress = Address.parse("EQBv3ZyJGTOflNI318e8vJxhuaviIUx6VenKXs2YNeCK93U8");
 
     console.log('Compiling Vesting Wallet code...');
@@ -40,16 +39,19 @@ export async function run(provider: NetworkProvider) {
     try {
       const stats = await vestingMaster.getVestingStats();
       const royaltyFee = await vestingMaster.getRoyaltyFee();
+      const ownerAddress = await vestingMaster.getOwner();
+      const loggerAddr = await vestingMaster.getLoggerAddress();
     
-      console.log('Vesting Master deployed successfully!');
+      console.log('\nVesting Master deployed successfully!');
       console.log('Contract address:', vestingMaster.address.toString());
-      console.log('Owner address:', provider.sender().address!.toString());
+      console.log('Owner address:', ownerAddress.toString());
+      console.log('Logger address:', loggerAddr.toString());
       console.log('Royalty fee per wallet creation:', fromNano(royaltyFee), 'TON');
       console.log('Current statistics:');
       console.log('- Total wallets created:', stats.totalWalletsCreated);
       console.log('- Total royalty collected:', fromNano(stats.totalRoyaltyCollected), 'TON');
     } catch (e) {
-      console.log('Vesting Master deployed successfully!');
+      console.log('\nVesting Master deployed successfully!');
       console.log('Contract address:', vestingMaster.address.toString());
       console.log('Could not verify contract stats after deploy: ', e);
     }

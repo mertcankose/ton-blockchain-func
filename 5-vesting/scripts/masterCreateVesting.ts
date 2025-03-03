@@ -1,8 +1,9 @@
+// scripts/create-vesting.ts
 import { Address, toNano, fromNano } from "@ton/core";
 import { VestingMaster } from "../wrappers/VestingMaster";
 import { NetworkProvider } from "@ton/blueprint";
 
-const MASTER_CONTRACT_ADDRESS = "EQBV7BsIY-U4ywfkn7jLSbi_UIjkGR6UZQJY38T0N4U-GKB2";
+const MASTER_CONTRACT_ADDRESS = "EQD46xjiwKchK-Uwm4r2xuLKKbeHnXSGAwCTob9jS2Z3C0j-";
 const JETTON_MASTER_ADDRESS = "kQBQCVW3qnGKeBcumkLVD6x_K2nehE6xC5VsCyJZ02wvUBJy";
 
 const CUSTOM_PARAMS = {
@@ -19,6 +20,17 @@ function formatDate(timestamp: number): string {
 function formatDuration(seconds: number): string {
   const days = Math.floor(seconds / 86400);
   return days > 0 ? `${days} days` : `${seconds} seconds`;
+}
+
+// Permission tanımını açıklama
+function getPermissionDescription(permissionType: number): string {
+  switch(permissionType) {
+    case 1: return "Only Recipient";
+    case 2: return "Only Owner";
+    case 3: return "Both Owner and Recipient";
+    case 4: return "Neither (Disabled)";
+    default: return "Unknown";
+  }
 }
 
 export async function run(provider: NetworkProvider) {
@@ -47,9 +59,15 @@ export async function run(provider: NetworkProvider) {
     const cancelContractPermission = 2; // 1 = only_recipient, 2 = only_owner, 3 = both, 4 = neither
     const changeRecipientPermission = 2; // 1 = only_recipient, 2 = only_owner, 3 = both, 4 = neither
 
+    // Aynı adresi hem owner hem recipient olarak kullanmak yerine,
+    // bu örnekte owner ve recipient farklı olsun
+    const ownerAddress = provider.sender().address!;
+    // Recipient adresini değiştirmek istiyorsanız burayı düzenleyin
+    const recipientAddress = provider.sender().address!;
+
     const walletAddress = await vestingMaster.getWalletAddress(
-      provider.sender().address!,
-      provider.sender().address!, // Add recipient parameter (same as owner in this case)
+      ownerAddress,
+      recipientAddress,
       jettonMaster,
       vestingTotalAmount,
       startTime,
@@ -64,18 +82,18 @@ export async function run(provider: NetworkProvider) {
     console.log(
       "\nVesting Wallet will be created with these CUSTOM parameters:"
     );
-    console.log("- Owner:", provider.sender().address!.toString());
-    console.log("- Recipient:", provider.sender().address!.toString()); // Added recipient
+    console.log("- Owner:", ownerAddress.toString());
+    console.log("- Recipient:", recipientAddress.toString());
     console.log("- Jetton Master:", jettonMaster.toString());
     console.log("- Vesting Total Amount:", fromNano(vestingTotalAmount), "tokens");
     console.log("- Start Time:", formatDate(startTime));
     console.log("- Total Duration:", formatDuration(totalDuration));
     console.log("- Unlock Period:", formatDuration(unlockPeriod));
     console.log("- Cliff Duration:", formatDuration(cliffDuration));
+    console.log("- Auto Claim:", isAutoClaim ? "Yes" : "No");
+    console.log("- Cancel Contract Permission:", `${cancelContractPermission} (${getPermissionDescription(cancelContractPermission)})`);
+    console.log("- Change Recipient Permission:", `${changeRecipientPermission} (${getPermissionDescription(changeRecipientPermission)})`);
     console.log("- Wallet Address:", walletAddress.toString());
-    console.log("- Auto Claim:", isAutoClaim);
-    console.log("- Cancel Contract Permission:", cancelContractPermission);
-    console.log("- Change Recipient Permission:", changeRecipientPermission);
 
     console.log(
       `\nThis operation will cost ${fromNano(royaltyFee)} TON as royalty fee.`
@@ -85,10 +103,10 @@ export async function run(provider: NetworkProvider) {
     const result = await vestingMaster.sendCreateVestingWallet(
       provider.sender(),
       {
-        value: royaltyFee + toNano("0.1"), // Royalty + gas
+        value: royaltyFee + toNano("1"), // Royalty + gas
         queryId: 1n,
-        owner: provider.sender().address!,
-        recipient: provider.sender().address!, // Make sure this is set correctly
+        owner: ownerAddress,
+        recipient: recipientAddress,
         jettonMaster: jettonMaster,
         vestingTotalAmount: vestingTotalAmount,
         startTime: startTime,
@@ -98,7 +116,7 @@ export async function run(provider: NetworkProvider) {
         isAutoClaim: isAutoClaim,
         cancelContractPermission: cancelContractPermission,
         changeRecipientPermission: changeRecipientPermission,
-        forwardRemainingBalance: toNano("0.1"), // Forward remaining balance to the vesting wallet
+        forwardRemainingBalance: toNano("1"), // Forward remaining balance to the vesting wallet
       }
     );
 
@@ -111,12 +129,6 @@ export async function run(provider: NetworkProvider) {
       `   npx blueprint run wallet-info (after updating WALLET_ADDRESS to your new address)`
     );
 
-    return {
-      success: true,
-      address: walletAddress.toString(),
-    };
-    
-    
     return {
       success: true,
       address: walletAddress.toString(),

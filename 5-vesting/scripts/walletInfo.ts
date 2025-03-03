@@ -1,8 +1,9 @@
+// scripts/wallet-info.ts
 import { Address, fromNano } from '@ton/core';
 import { VestingWallet } from '../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 
-const WALLET_ADDRESS = "EQCiSBcd0CTIaw4crOY_0jJ6VIVUYdpjVX8Wdd8M8jVw8HX7";
+const WALLET_ADDRESS = "EQAa6Mdx5CE2HwHh8SowgB1kGaD_vMTmDt9NjuXu3ZQE4kKr";
 
 // Tarih formatı
 function formatDate(timestamp: number): string {
@@ -23,6 +24,17 @@ function formatDuration(seconds: number): string {
   return parts.join(', ');
 }
 
+// Permission açıklaması
+function getPermissionDescription(permissionType: number): string {
+  switch(permissionType) {
+    case 1: return "Only Recipient";
+    case 2: return "Only Owner";
+    case 3: return "Both Owner and Recipient";
+    case 4: return "Neither (Disabled)";
+    default: return "Unknown";
+  }
+}
+
 export async function run(provider: NetworkProvider) {
   try {
     console.log('Fetching Vesting Wallet information...');
@@ -32,31 +44,27 @@ export async function run(provider: NetworkProvider) {
     const vestingWallet = provider.open(VestingWallet.createFromAddress(walletAddress));
     
     const vestingData = await vestingWallet.getVestingData();
-    console.log("vestingData", vestingData);
+    console.log("Vesting data fetched successfully!");
 
     const owner = await vestingWallet.getOwner();
-    console.log("owner", owner);
+    const recipient = await vestingWallet.getRecipient();
 
     const cancelContractPermission = await vestingWallet.getCancelContractPermission();
-    console.log("cancelContractPermission", cancelContractPermission);
-
     const changeRecipientPermission = await vestingWallet.getChangeRecipientPermission();
-    console.log("changeRecipientPermission", changeRecipientPermission);
-
     const isAutoClaim = await vestingWallet.getIsAutoClaim();
-    console.log("isAutoClaim", isAutoClaim);
 
     const currentUnlocked = await vestingWallet.getCurrentUnlockedAmount();
-    console.log("currentUnlocked", currentUnlocked);
-
     const currentLocked = await vestingWallet.getCurrentLockedAmount();
-    console.log("currentLocked", currentLocked);
-
     const claimedAmount = await vestingWallet.getClaimedAmount();
-    console.log("claimedAmount", claimedAmount);
-
     const claimableAmount = await vestingWallet.getClaimableAmount();
-    console.log("claimableAmount", claimableAmount);
+    const seqno = await vestingWallet.getSeqno();
+    
+    console.log('\n===== VESTING WALLET INFORMATION =====');
+    console.log('Wallet Address:', walletAddress.toString());
+    console.log('Owner Address:', owner.toString());
+    console.log('Recipient Address:', recipient.toString());
+    console.log('Jetton Master:', vestingData.jettonMasterAddress.toString());
+    console.log('Current Seqno:', seqno);
     
     console.log('\n--- Vesting Schedule ---');
     console.log('Start Time:', formatDate(vestingData.vestingStartTime));
@@ -72,6 +80,13 @@ export async function run(provider: NetworkProvider) {
     console.log('Claimed Amount:', fromNano(claimedAmount), 'tokens');
     console.log('Claimable Amount:', fromNano(claimableAmount), 'tokens');
     
+    console.log('\n--- Permissions ---');
+    console.log('Auto Claim:', isAutoClaim ? 'Yes' : 'No');
+    console.log('Cancel Contract Permission:', cancelContractPermission, 
+                `(${getPermissionDescription(cancelContractPermission)})`);
+    console.log('Change Recipient Permission:', changeRecipientPermission, 
+                `(${getPermissionDescription(changeRecipientPermission)})`);
+    
     const now = Math.floor(Date.now() / 1000);
     const progress = Math.min(
       100,
@@ -85,6 +100,7 @@ export async function run(provider: NetworkProvider) {
       data: {
         address: walletAddress.toString(),
         owner: owner.toString(),
+        recipient: recipient.toString(),
         jettonMaster: vestingData.jettonMasterAddress.toString(),
         totalAmount: fromNano(vestingData.vestingTotalAmount),
         startTime: vestingData.vestingStartTime,
@@ -97,7 +113,8 @@ export async function run(provider: NetworkProvider) {
         locked: fromNano(currentLocked),
         unlocked: fromNano(currentUnlocked),
         claimed: fromNano(claimedAmount),
-        claimable: fromNano(claimableAmount)
+        claimable: fromNano(claimableAmount),
+        seqno: seqno
       }
     };
   } catch (error) {

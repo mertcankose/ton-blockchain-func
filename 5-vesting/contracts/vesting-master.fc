@@ -41,9 +41,9 @@ int equal_slices(slice a, slice b) {
     return a.slice_hash() == b.slice_hash();
 }
 
-;; Storage TL-B Scheme
-;; storage#_ owner_address:MsgAddress vesting_wallet_code:^Cell logger_address:MsgAddress
-;;            total_wallets_created:uint64 total_royalty_collected:Coins = Storage;
+;; Modified Storage TL-B Scheme 
+;; storage#_ owner_address:MsgAddress ^[vesting_wallet_code:^Cell 
+;;            logger_address:MsgAddress total_wallets_created:uint64 total_royalty_collected:Coins] = Storage;
 
 (slice, cell, slice, int, int) load_data() inline {
     var ds = get_data().begin_parse();
@@ -52,10 +52,15 @@ int equal_slices(slice a, slice b) {
     }
     
     slice owner_address = ds~load_msg_addr();
-    cell vesting_wallet_code = ds~load_ref();
-    slice logger_address = ds~load_msg_addr();
-    int total_wallets_created = ds~load_uint(64);
-    int total_royalty_collected = ds~load_coins();
+    
+    ;; Load all other data from reference cell
+    cell extra_data_cell = ds~load_ref();
+    slice extra_data = extra_data_cell.begin_parse();
+    
+    cell vesting_wallet_code = extra_data~load_ref();
+    slice logger_address = extra_data~load_msg_addr();
+    int total_wallets_created = extra_data~load_uint(64);
+    int total_royalty_collected = extra_data~load_coins();
     
     return (owner_address, vesting_wallet_code, logger_address, total_wallets_created, total_royalty_collected);
 }
@@ -63,12 +68,19 @@ int equal_slices(slice a, slice b) {
 
 () save_data(slice owner_address, cell vesting_wallet_code, slice logger_address, int total_wallets_created, 
     int total_royalty_collected) impure inline {
-    set_data(begin_cell()
-        .store_slice(owner_address)
+    
+    ;; Create extra data cell with everything except owner address
+    cell extra_data = begin_cell()
         .store_ref(vesting_wallet_code)
         .store_slice(logger_address)
         .store_uint(total_wallets_created, 64)
         .store_coins(total_royalty_collected)
+        .end_cell();
+    
+    ;; Store main data
+    set_data(begin_cell()
+        .store_slice(owner_address)
+        .store_ref(extra_data)
         .end_cell());
 }
 
@@ -86,22 +98,45 @@ cell create_vesting_wallet_state_init(slice owner_address, slice recipient_addre
     int vesting_total_amount, int vesting_params, int is_auto_claim, 
     int cancel_permission, int change_recipient_permission, cell wallet_code) inline {
 
-    cell data = begin_cell()
-        .store_slice(owner_address) 
+    ;; Create data cell structure for vesting wallet
+    ;; First cell has owner_address only
+    cell data1 = begin_cell()
+        .store_slice(owner_address)
+        .end_cell();
+    
+    ;; Second cell has recipient and jetton master addresses
+    cell data2 = begin_cell()
         .store_slice(recipient_address)
         .store_slice(jetton_master_address)
+        .end_cell();
+    
+    ;; Third cell has the vesting parameters
+    cell data3 = begin_cell()
         .store_coins(vesting_total_amount)
         .store_uint(vesting_params, 128)
         .store_uint(is_auto_claim, 1)
         .store_uint(cancel_permission, 3)
         .store_uint(change_recipient_permission, 3)
+        .end_cell();
+    
+    ;; Fourth cell for claimed amount and seqno
+    cell data4 = begin_cell()
         .store_coins(0) ;; Initial claimed amount
+        .store_uint(0, 32) ;; Initial seqno
+        .end_cell();
+    
+    ;; Combine all data cells
+    cell combined_data = begin_cell()
+        .store_ref(data1)
+        .store_ref(data2)
+        .store_ref(data3)
+        .store_ref(data4)
         .end_cell();
     
     return begin_cell()
         .store_uint(0, 2)
         .store_dict(wallet_code)
-        .store_dict(data)
+        .store_dict(combined_data)
         .store_uint(0, 1)
         .end_cell();
 }
@@ -188,7 +223,7 @@ cell create_vesting_wallet_state_init(slice owner_address, slice recipient_addre
             .store_ref(state_init)
             .store_ref(begin_cell().end_cell());
         
-        send_raw_message(msg.end_cell(), send_mode::carry_remaining_gas);
+        send_raw_message(msg.end_cell(), send_mode::pay_gas_separately);
         
         ;; Send royalty fee to owner
         var royalty_msg = begin_cell()
@@ -207,15 +242,25 @@ cell create_vesting_wallet_state_init(slice owner_address, slice recipient_addre
             var log_msg = begin_cell()
             .store_uint(0x18, 6)
             .store_slice(logger_address)
-            .store_coins(forward_remaining_balance) ;; 0.05 TON for processing
+            .store_coins(10000000)
             .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
             .store_uint(op::register_wallet, 32)
-            .store_uint(query_id, 64)
-            .store_slice(vesting_wallet_address)
-            .store_slice(jetton_master)
-            .store_slice(vesting_owner)
-            .store_slice(vesting_recipient)
-            .store_uint(is_auto_claim, 32);
+            .store_uint(query_id, 64);
+            
+            ;; Create a reference cell for the log data
+            cell log_data = begin_cell()
+                .store_slice(vesting_wallet_address)
+                .store_slice(jetton_master)
+                .end_cell();
+                
+            ;; Create another reference cell for more log data
+            cell log_data2 = begin_cell()
+                .store_slice(vesting_owner)
+                .store_slice(vesting_recipient)
+                .store_uint(is_auto_claim, 32)
+                .end_cell();
+                
+            log_msg = log_msg.store_ref(log_data).store_ref(log_data2);
             
             send_raw_message(log_msg.end_cell(), send_mode::pay_gas_separately);
         }
@@ -233,7 +278,7 @@ cell create_vesting_wallet_state_init(slice owner_address, slice recipient_addre
         var addr_msg = begin_cell()
             .store_uint(0x18, 6)
             .store_slice(sender_addr)
-            .store_coins(forward_remaining_balance) ;; Forward all remaining balance 0.01 TON
+            .store_coins(10000000) ;; Minimal amount
             .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
             .store_uint(op::take_wallet_address, 32)
             .store_uint(query_id, 64)

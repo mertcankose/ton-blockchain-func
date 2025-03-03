@@ -62,11 +62,12 @@ int equal_slices(slice a, slice b) {
     return a.slice_hash() == b.slice_hash();
 }
 
-;; Updated Storage TL-B scheme for Vesting Wallet
-;; storage#_ owner_address:MsgAddress recipient_address:MsgAddress jetton_master_address:MsgAddress
-;;            vesting_total_amount:Coins
-;;            packed_params:uint128 is_auto_claim:uint1 cancel_contract_permission:uint3 change_recipient_permission:uint3
-;;            claimed_amount:Coins = Storage;
+;; Updated Storage TL-B scheme for Vesting Wallet - split into multiple cells
+;; Storage structure is now:
+;; storage#_ ^[owner_address:MsgAddress] ^[recipient_address:MsgAddress jetton_master_address:MsgAddress]
+;;           ^[vesting_total_amount:Coins packed_params:uint128 is_auto_claim:uint1 
+;;             cancel_contract_permission:uint3 change_recipient_permission:uint3]
+;;           ^[claimed_amount:Coins seqno:uint32] = Storage;
 
 ;; Unpack vesting parameters from packed format
 (int, int, int, int) unpack_vesting_params(int packed_params) inline {
@@ -83,16 +84,31 @@ int equal_slices(slice a, slice b) {
         return (null(), null(), null(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
-    slice owner_address = ds~load_msg_addr();
-    slice recipient_address = ds~load_msg_addr();
-    slice jetton_master_address = ds~load_msg_addr();
-    int vesting_total_amount = ds~load_coins();
-    int packed_params = ds~load_uint(128);
-    int is_auto_claim = ds~load_uint(1);
-    int cancel_contract_permission = ds~load_uint(3);
-    int change_recipient_permission = ds~load_uint(3);
-    int claimed_amount = ds~load_coins();
-    int seqno = ds~load_uint(32);
+    ;; Load from cell 1 - owner address
+    cell cell1 = ds~load_ref();
+    slice data1 = cell1.begin_parse();
+    slice owner_address = data1~load_msg_addr();
+    
+    ;; Load from cell 2 - recipient and jetton master addresses
+    cell cell2 = ds~load_ref();
+    slice data2 = cell2.begin_parse();
+    slice recipient_address = data2~load_msg_addr();
+    slice jetton_master_address = data2~load_msg_addr();
+    
+    ;; Load from cell 3 - vesting parameters
+    cell cell3 = ds~load_ref();
+    slice data3 = cell3.begin_parse();
+    int vesting_total_amount = data3~load_coins();
+    int packed_params = data3~load_uint(128);
+    int is_auto_claim = data3~load_uint(1);
+    int cancel_contract_permission = data3~load_uint(3);
+    int change_recipient_permission = data3~load_uint(3);
+    
+    ;; Load from cell 4 - claimed amount and seqno
+    cell cell4 = ds~load_ref();
+    slice data4 = cell4.begin_parse();
+    int claimed_amount = data4~load_coins();
+    int seqno = data4~load_uint(32);
     
     ;; Unpack vesting parameters
     (int vesting_start_time, int vesting_total_duration, int unlock_period, int cliff_duration) = unpack_vesting_params(packed_params);
@@ -127,19 +143,39 @@ int equal_slices(slice a, slice b) {
     (unlock_period << 32) | 
                        cliff_duration;
 
-    ;; Store data
-    set_data(
-        begin_cell()
+    ;; Cell 1 - owner address
+    cell cell1 = begin_cell()
         .store_slice(owner_address)
+        .end_cell();
+    
+    ;; Cell 2 - recipient and jetton master addresses
+    cell cell2 = begin_cell()
         .store_slice(recipient_address)
         .store_slice(jetton_master_address)
+        .end_cell();
+    
+    ;; Cell 3 - vesting parameters
+    cell cell3 = begin_cell()
         .store_coins(vesting_total_amount)
         .store_uint(packed_params, 128)
         .store_uint(is_auto_claim, 1)
         .store_uint(cancel_contract_permission, 3)
         .store_uint(change_recipient_permission, 3)
+        .end_cell();
+    
+    ;; Cell 4 - claimed amount and seqno
+    cell cell4 = begin_cell()
         .store_coins(claimed_amount)
         .store_uint(seqno, 32)
+        .end_cell();
+    
+    ;; Combine all cells
+    set_data(
+        begin_cell()
+        .store_ref(cell1)
+        .store_ref(cell2)
+        .store_ref(cell3)
+        .store_ref(cell4)
         .end_cell()
     );
 }
@@ -228,23 +264,23 @@ int calculate_locked_amount(int vesting_total_amount, int vesting_start_time, in
     throw_unless(error::invalid_amount, claimable_amount > 0);
 
     ;; Create jetton transfer message - send to recipient_address
+    var msg_body = begin_cell()
+        .store_uint(op::transfer, 32)
+        .store_uint(query_id, 64)
+        .store_coins(claimable_amount)
+        .store_slice(recipient_address)
+        .store_slice(recipient_address) ;; response destination is recipient
+        .store_uint(0, 1) ;; No custom payload
+        .store_coins(forward_ton_amount)
+        .store_uint(0, 1) ;; No forward payload
+        .end_cell();
+
     var msg = begin_cell()
-      .store_uint(0x18, 6)
-      .store_slice(jetton_wallet_address)
-      .store_coins(forward_ton_amount + gas::jetton_transfer) ;; gas
-      .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-      .store_ref(
-        begin_cell()
-          .store_uint(op::transfer, 32)
-          .store_uint(query_id, 64)
-          .store_coins(claimable_amount)
-          .store_slice(recipient_address)
-          .store_slice(recipient_address) ;; response destination is recipient
-          .store_uint(0, 1) ;; No custom payload
-          .store_coins(forward_ton_amount)
-          .store_uint(0, 1) ;; No forward payload
-        .end_cell()
-    );
+        .store_uint(0x18, 6)
+        .store_slice(jetton_wallet_address)
+        .store_coins(forward_ton_amount + gas::jetton_transfer) ;; gas
+        .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_ref(msg_body);
 
     send_raw_message(msg.end_cell(), send_mode::pay_gas_separately);
 
@@ -293,23 +329,23 @@ int calculate_locked_amount(int vesting_total_amount, int vesting_start_time, in
         
         ;; Send all remaining tokens to return_address
         if (remaining_amount > 0) {
+            var msg_body = begin_cell()
+                .store_uint(op::transfer, 32)
+                .store_uint(query_id, 64)
+                .store_coins(remaining_amount)
+                .store_slice(sender_addr)
+                .store_slice(sender_addr) ;; response destination
+                .store_uint(0, 1) ;; No custom payload
+                .store_coins(forward_ton_amount) 
+                .store_uint(0, 1) ;; No forward payload
+                .end_cell();
+                
             var msg = begin_cell()
-              .store_uint(0x18, 6)
-              .store_slice(jetton_wallet_address)
-              .store_coins(forward_ton_amount + gas::jetton_transfer) ;; gas
-              .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-              .store_ref(
-                begin_cell()
-                  .store_uint(op::transfer, 32)
-                  .store_uint(query_id, 64)
-                  .store_coins(remaining_amount)
-                  .store_slice(sender_addr)
-                  .store_slice(sender_addr) ;; response destination
-                  .store_uint(0, 1) ;; No custom payload
-                  .store_coins(forward_ton_amount) 
-                  .store_uint(0, 1) ;; No forward payload
-                .end_cell()
-            );
+                .store_uint(0x18, 6)
+                .store_slice(jetton_wallet_address)
+                .store_coins(forward_ton_amount + gas::jetton_transfer) ;; gas
+                .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+                .store_ref(msg_body);
             
             send_raw_message(msg.end_cell(), send_mode::pay_gas_separately);
         }
@@ -357,23 +393,23 @@ int calculate_locked_amount(int vesting_total_amount, int vesting_start_time, in
         throw_unless(error::invalid_amount, claimable_amount > 0);
 
         ;; Create jetton transfer message - now sending to recipient_address
+        var msg_body = begin_cell()
+            .store_uint(op::transfer, 32)
+            .store_uint(query_id, 64)
+            .store_coins(claimable_amount)
+            .store_slice(recipient_address)
+            .store_slice(sender_addr)
+            .store_uint(0, 1)
+            .store_coins(forward_ton_amount)
+            .store_uint(0, 1)
+            .end_cell();
+            
         var msg = begin_cell()
-          .store_uint(0x18, 6)
-          .store_slice(jetton_wallet_address)
-          .store_coins(forward_ton_amount + gas::jetton_transfer) ;; gas
-          .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-          .store_ref(
-            begin_cell()
-              .store_uint(op::transfer, 32)
-              .store_uint(query_id, 64)
-              .store_coins(claimable_amount)
-              .store_slice(recipient_address)
-              .store_slice(sender_addr)
-              .store_uint(0, 1)
-              .store_coins(forward_ton_amount)
-              .store_uint(0, 1)
-            .end_cell()
-        );
+            .store_uint(0x18, 6)
+            .store_slice(jetton_wallet_address)
+            .store_coins(forward_ton_amount + gas::jetton_transfer) ;; gas
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(msg_body);
 
         send_raw_message(msg.end_cell(), send_mode::pay_gas_separately);
 
@@ -399,23 +435,23 @@ int calculate_locked_amount(int vesting_total_amount, int vesting_start_time, in
         throw_unless(error::access_denied, equal_slices(to_addr, owner_address));
     
         ;; Create jetton transfer message
+        var msg_body = begin_cell()
+            .store_uint(op::transfer, 32)
+            .store_uint(query_id, 64)
+            .store_coins(jetton_amount)
+            .store_slice(to_addr)
+            .store_slice(sender_addr)
+            .store_uint(0, 1)
+            .store_coins(forward_ton_amount)
+            .store_uint(0, 1)
+            .end_cell();
+            
         var msg = begin_cell()
-          .store_uint(0x18, 6)
-          .store_slice(jetton_wallet_address)
-          .store_coins(forward_ton_amount + gas::jetton_transfer)
-          .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-          .store_ref(
-            begin_cell()
-              .store_uint(op::transfer, 32)
-              .store_uint(query_id, 64)
-              .store_coins(jetton_amount)
-              .store_slice(to_addr)
-              .store_slice(sender_addr)
-              .store_uint(0, 1)
-              .store_coins(forward_ton_amount)
-              .store_uint(0, 1)
-            .end_cell()
-        );
+            .store_uint(0x18, 6)
+            .store_slice(jetton_wallet_address)
+            .store_coins(forward_ton_amount + gas::jetton_transfer)
+            .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .store_ref(msg_body);
         
         send_raw_message(msg.end_cell(), send_mode::pay_gas_separately);
         return ();

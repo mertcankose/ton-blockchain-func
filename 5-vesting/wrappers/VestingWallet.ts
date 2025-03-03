@@ -36,13 +36,18 @@ export const VestingWalletOpcodes = {
 
 export type VestingWalletConfig = {
   owner_address: Address;
+  recipient_address: Address;
   jetton_master_address: Address;
   vesting_total_amount: bigint;
   vesting_start_time: number;
   vesting_total_duration: number;
   unlock_period: number;
   cliff_duration: number;
+  is_auto_claim: number;
+  cancel_contract_permission: number;
+  change_recipient_permission: number;
   claimed_amount: bigint;
+  seqno: number;
 };
 
 export function packVestingParams(
@@ -68,14 +73,41 @@ export function vestingWalletConfigToCell(config: VestingWalletConfig): Cell {
     config.cliff_duration
   );
 
-  const cell = beginCell()
+  // Yeni hücre yapısı: 4 ayrı referans hücresinde veri
+  
+  // Cell 1 - owner address
+  const cell1 = beginCell()
     .storeAddress(config.owner_address)
+    .endCell();
+  
+  // Cell 2 - recipient and jetton master addresses
+  const cell2 = beginCell()
+    .storeAddress(config.recipient_address)
     .storeAddress(config.jetton_master_address)
+    .endCell();
+  
+  // Cell 3 - vesting parameters
+  const cell3 = beginCell()
     .storeCoins(config.vesting_total_amount)
     .storeUint(packedParams, 128)
-    .storeCoins(config.claimed_amount);
-
-  return cell.endCell();
+    .storeUint(config.is_auto_claim, 1)
+    .storeUint(config.cancel_contract_permission, 3)
+    .storeUint(config.change_recipient_permission, 3)
+    .endCell();
+  
+  // Cell 4 - claimed amount and seqno
+  const cell4 = beginCell()
+    .storeCoins(config.claimed_amount)
+    .storeUint(config.seqno, 32)
+    .endCell();
+  
+  // Ana hücre, dört referansı içeriyor
+  return beginCell()
+    .storeRef(cell1)
+    .storeRef(cell2)
+    .storeRef(cell3)
+    .storeRef(cell4)
+    .endCell();
 }
 
 export class VestingWallet implements Contract {
@@ -101,6 +133,7 @@ export class VestingWallet implements Contract {
   // Create with default parameters
   static createWithDefaults(
     ownerAddress: Address,
+    recipientAddress: Address, // Recipient address eklendi
     code: Cell,
     options: {
       jettonMasterAddress?: Address | string;
@@ -109,6 +142,9 @@ export class VestingWallet implements Contract {
       totalDuration?: number;
       unlockPeriod?: number;
       cliffDuration?: number;
+      isAutoClaim?: number;
+      cancelContractPermission?: number;
+      changeRecipientPermission?: number;
     } = {}
   ) {
     // Use current time + delay for start time if not provided
@@ -126,10 +162,14 @@ export class VestingWallet implements Contract {
       jettonMaster = options.jettonMasterAddress;
     }
 
-    const vestingTotalAmount = options.vestingTotalAmount || 0n;
+    const vestingTotalAmount = options.vestingTotalAmount || DEFAULT_VESTING_PARAMS.VESTING_TOTAL_AMOUNT;
+    const isAutoClaim = options.isAutoClaim !== undefined ? options.isAutoClaim : 0;
+    const cancelContractPermission = options.cancelContractPermission || 2; // Default: only_owner
+    const changeRecipientPermission = options.changeRecipientPermission || 2; // Default: only_owner
 
     const config: VestingWalletConfig = {
       owner_address: ownerAddress,
+      recipient_address: recipientAddress,
       jetton_master_address: jettonMaster,
       vesting_total_amount: vestingTotalAmount,
       vesting_start_time: startTime,
@@ -139,7 +179,11 @@ export class VestingWallet implements Contract {
         options.unlockPeriod || DEFAULT_VESTING_PARAMS.UNLOCK_PERIOD,
       cliff_duration:
         options.cliffDuration || DEFAULT_VESTING_PARAMS.CLIFF_DURATION,
+      is_auto_claim: isAutoClaim,
+      cancel_contract_permission: cancelContractPermission,
+      change_recipient_permission: changeRecipientPermission,
       claimed_amount: 0n,
+      seqno: 0,
     };
 
     return VestingWallet.createFromConfig(config, code);
@@ -204,14 +248,40 @@ export class VestingWallet implements Contract {
     });
   }
 
-  // cancelVesting
-  async cancelVesting(provider: ContractProvider, via: Sender,
+  // External message ile claim işlemi (seqno gerektiriyor)
+  async sendClaimUnlockedExternal(
+    provider: ContractProvider,
+    seqno: number,
+    validUntil: number,
     opts: {
       forwardTonAmount: bigint;
       jettonWalletAddress: Address;
     }
   ) {
-    const queryId = 20
+    const queryId = 1n;
+
+    return await provider.external(
+      beginCell()
+        .storeUint(seqno, 32)
+        .storeUint(validUntil, 32)
+        .storeUint(VestingWalletOpcodes.claim_unlocked, 32)
+        .storeUint(queryId, 64)
+        .storeCoins(opts.forwardTonAmount)
+        .storeAddress(opts.jettonWalletAddress)
+        .endCell()
+    );
+  }
+
+  // cancelVesting
+  async cancelVesting(
+    provider: ContractProvider, 
+    via: Sender,
+    opts: {
+      forwardTonAmount: bigint;
+      jettonWalletAddress: Address;
+    }
+  ) {
+    const queryId = BigInt(Math.floor(Math.random() * 10000000000))
 
     return await provider.internal(via, {
       value: toNano("0.05"),
@@ -226,12 +296,14 @@ export class VestingWallet implements Contract {
   }
 
   // changeRecipient
-  async changeRecipient(provider: ContractProvider, via: Sender,
+  async changeRecipient(
+    provider: ContractProvider, 
+    via: Sender,
     opts: {
       newRecipientAddress: Address;
     }
   ) {
-    const queryId = 21
+    const queryId = BigInt(Math.floor(Math.random() * 10000000000))
 
     return await provider.internal(via, {
       value: toNano("0.05"),
@@ -261,12 +333,19 @@ export class VestingWallet implements Contract {
       cancelContractPermission: result.stack.readNumber(),
       changeRecipientPermission: result.stack.readNumber(),
       claimedAmount: result.stack.readBigNumber(),
+      seqno: result.stack.readNumber(),  // seqno eklendi
     };
   }
 
   // Get owner address
   async getOwner(provider: ContractProvider) {
     const result = await provider.get("get_owner", []);
+    return result.stack.readAddress();
+  }
+
+  // Get recipient address
+  async getRecipient(provider: ContractProvider) {
+    const result = await provider.get("get_recipient", []);
     return result.stack.readAddress();
   }
 
@@ -340,7 +419,6 @@ export class VestingWallet implements Contract {
     const result = await provider.get("get_claimable_amount", []);
     return result.stack.readBigNumber();
   }
-
 
   async getVestingTotalAmount(provider: ContractProvider) {
     const result = await provider.get("get_vesting_total_amount", []);
