@@ -68,12 +68,17 @@ export class VestingMaster implements Contract {
       value: bigint;
       queryId: bigint;
       owner: Address;
+      recipient: Address;
       jettonMaster: Address;
       vestingTotalAmount: bigint;
       startTime: number;
       totalDuration: number;
       unlockPeriod: number;
       cliffDuration: number;
+      isAutoClaim: number;
+      forwardRemainingBalance: bigint;
+      cancelContractPermission: number;
+      changeRecipientPermission: number;
     }
   ) {
     return await provider.internal(via, {
@@ -83,12 +88,17 @@ export class VestingMaster implements Contract {
         .storeUint(VestingMasterOpcodes.create_vesting_wallet, 32)
         .storeUint(opts.queryId, 64)
         .storeAddress(opts.owner)
+        .storeAddress(opts.recipient)
         .storeAddress(opts.jettonMaster)
         .storeCoins(opts.vestingTotalAmount)
         .storeUint(opts.startTime, 32)
         .storeUint(opts.totalDuration, 32)
         .storeUint(opts.unlockPeriod, 32)
         .storeUint(opts.cliffDuration, 32)
+        .storeUint(opts.isAutoClaim, 1)
+        .storeUint(opts.cancelContractPermission, 32)
+        .storeUint(opts.changeRecipientPermission, 32)
+        .storeCoins(opts.forwardRemainingBalance)
         .endCell(),
     });
   }
@@ -99,6 +109,7 @@ export class VestingMaster implements Contract {
     via: Sender,
     opts: {
       owner: Address;
+      recipient: Address;
       jettonMaster: Address;
       vestingTotalAmount: bigint;
       includeStateInit: boolean;
@@ -106,6 +117,9 @@ export class VestingMaster implements Contract {
       totalDuration: number;
       unlockPeriod: number;
       cliffDuration: number;
+      isAutoClaim: number;
+      cancelContractPermission: number;
+      changeRecipientPermission: number;
     }
   ) {
     const queryId = BigInt(Math.floor(Math.random() * 10000000000));
@@ -114,6 +128,7 @@ export class VestingMaster implements Contract {
       .storeUint(VestingMasterOpcodes.provide_wallet_address, 32)
       .storeUint(queryId, 64)
       .storeAddress(opts.owner)
+      .storeAddress(opts.recipient)
       .storeAddress(opts.jettonMaster)
       .storeCoins(opts.vestingTotalAmount)
       .storeBit(opts.includeStateInit)
@@ -121,6 +136,9 @@ export class VestingMaster implements Contract {
       .storeUint(opts.totalDuration, 32)
       .storeUint(opts.unlockPeriod, 32)
       .storeUint(opts.cliffDuration, 32)
+      .storeUint(opts.isAutoClaim, 32)
+      .storeUint(opts.cancelContractPermission, 32)
+      .storeUint(opts.changeRecipientPermission, 32)
       .endCell()
 
     return await provider.internal(via, {

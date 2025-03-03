@@ -86,12 +86,17 @@ export async function run(provider: NetworkProvider) {
         value: royaltyFee + toNano("0.05"), // Royalty + gas
         queryId: 0n,
         owner: provider.sender().address!,
+        recipient: provider.sender().address!,
         jettonMaster: jettonMaster,
         vestingTotalAmount: vestingTotalAmount,
         startTime: startTime,
         totalDuration: totalDuration,
         unlockPeriod: unlockPeriod,
         cliffDuration: cliffDuration,
+        isAutoClaim: 1, // 0 = no auto claim, 1 = auto claim
+        cancelContractPermission: 1, // 1 = only_recipient, 2 = only_owner, 3 = both, 4 = neither
+        changeRecipientPermission: 1, // 1 = only_recipient, 2 = only_owner, 3 = both, 4 = neither
+        forwardRemainingBalance: toNano("0.05"), // Forward remaining balance to the vesting wallet
       }
     );
 

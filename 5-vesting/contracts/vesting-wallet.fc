@@ -10,12 +10,19 @@ const int op::add_whitelist = 0x1234;
 const int op::send_jettons = 0x7777;
 const int op::report_status = 0x7FEE;
 const int op::claim_unlocked = 0x8888;
+const int op::cancel_vesting = 0x9999;
+const int op::change_recipient = 0xaaaa;
+
+;; Permission Constants
+const int permission::only_recipient = 1;
+const int permission::only_owner = 2;
+const int permission::both = 3;
+const int permission::neither = 4;
 
 ;; Common Errors
 const int error::invalid_op = 0xffff;  ;; Invalid operation
 const int error::access_denied = 0xffa0; ;; Access denied
 const int error::invalid_amount = 0xffa2; ;; Invalid amount
-const int error::not_owner = 0xffa5; ;; Not owner
 
 ;; Vesting Specific Errors
 const int error::funds_locked = 0xff05; ;; Cannot send locked funds
@@ -55,9 +62,10 @@ int equal_slices(slice a, slice b) {
 }
 
 ;; Updated Storage TL-B scheme for Vesting Wallet
-;; storage#_ owner_address:MsgAddress jetton_master_address:MsgAddress
-;;            packed_params:uint128 seqno:uint64 claimed_amount:Coins
-;;            whitelist:(HashmapE 267 True) vesting_total_amount:Coins = Storage;
+;; storage#_ owner_address:MsgAddress recipient_address:MsgAddress jetton_master_address:MsgAddress
+;;            vesting_total_amount:Coins
+;;            packed_params:uint128 is_auto_claim:uint1 cancel_contract_permission:uint3 change_recipient_permission:uint3
+;;            claimed_amount:Coins whitelist:(HashmapE 267 True) = Storage;
 
 ;; Unpack vesting parameters from packed format
 (int, int, int, int) unpack_vesting_params(int packed_params) inline {
@@ -68,18 +76,22 @@ int equal_slices(slice a, slice b) {
     return (vesting_start_time, vesting_total_duration, unlock_period, cliff_duration);
 }
 
-;; Load data - Optimized storage format
-(slice, slice, int, int, int, int, int, int, cell) load_data() inline {
+(slice, slice, slice, int, int, int, int, int, int, int, int, int, int, cell) load_data() inline {
     var ds = get_data().begin_parse();
     if (ds.slice_empty?()) {
-        return (null(), null(), 0, 0, 0, 0, 0, 0, new_dict());
+        return (null(), null(), null(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, new_dict());
     }
 
     slice owner_address = ds~load_msg_addr();
+    slice recipient_address = ds~load_msg_addr();
     slice jetton_master_address = ds~load_msg_addr();
     int vesting_total_amount = ds~load_coins();
     int packed_params = ds~load_uint(128);
+    int is_auto_claim = ds~load_uint(32);
+    int cancel_contract_permission = ds~load_uint(32);
+    int change_recipient_permission = ds~load_uint(32);
     int claimed_amount = ds~load_coins();
+    int seqno = ds~load_uint(32);
 
     ;; Load whitelist
     cell whitelist = new_dict();
@@ -92,23 +104,28 @@ int equal_slices(slice a, slice b) {
 
     return (
         owner_address,
+        recipient_address,
         jetton_master_address,
         vesting_total_amount,
         vesting_start_time,
         vesting_total_duration,
         unlock_period,
         cliff_duration,
+        is_auto_claim,
+        cancel_contract_permission,
+        change_recipient_permission,
         claimed_amount,
+        seqno,
         whitelist
     );
 }
 
-;; Save data - Optimized storage format
-() save_data(slice owner_address, slice jetton_master_address,
+() save_data(slice owner_address, slice recipient_address, slice jetton_master_address,
     int vesting_total_amount,
     int vesting_start_time, int vesting_total_duration, 
     int unlock_period, int cliff_duration, 
-    int claimed_amount, cell whitelist) impure inline {
+    int is_auto_claim, int cancel_contract_permission, int change_recipient_permission,
+    int claimed_amount, int seqno, cell whitelist) impure inline {
     
     ;; Pack vesting parameters
     int packed_params = (vesting_start_time << 96) | 
@@ -120,13 +137,32 @@ int equal_slices(slice a, slice b) {
     set_data(
         begin_cell()
         .store_slice(owner_address)
+        .store_slice(recipient_address)
         .store_slice(jetton_master_address)
         .store_coins(vesting_total_amount)
         .store_uint(packed_params, 128)
+        .store_uint(is_auto_claim, 32)
+        .store_uint(cancel_contract_permission, 32)
+        .store_uint(change_recipient_permission, 32)
         .store_coins(claimed_amount)
+        .store_uint(seqno, 32)
         .store_dict(whitelist)
         .end_cell()
     );
+}
+
+;; Check permission
+int check_permission(slice sender_addr, slice owner_address, slice recipient_address, int permission_type) inline {
+    if (permission_type == permission::only_owner) {
+        return equal_slices(sender_addr, owner_address);
+    } 
+    if (permission_type == permission::only_recipient) {
+        return equal_slices(sender_addr, recipient_address);
+    }
+    if (permission_type == permission::both) {
+        return equal_slices(sender_addr, owner_address) | equal_slices(sender_addr, recipient_address);
+    }
+    return 0; ;; permission::neither
 }
 
 ;; Calculate unlocked amount at a specific time
@@ -179,14 +215,69 @@ cell add_to_whitelist(cell whitelist, slice address) impure inline {
     return whitelist.udict_set_builder(ADDRESS_SIZE, addr_hash, begin_cell().store_int(-1, 1));
 }
 
-;; Verify if jetton transfer is allowed according to vesting rules
-int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell whitelist, slice owner_address) inline {
-    ;; If trying to transfer locked jettons
-    if (amount > (get_balance().pair_first() - locked_amount)) {
-        ;; Can only send locked jettons to owner or whitelisted addresses
-        return equal_slices(to_addr, owner_address) | is_whitelisted(to_addr, whitelist);
-    }
-    return -1; ;; Can freely transfer unlocked jettons
+() recv_external(slice in_msg) impure {
+    ;; Parse message
+    int msg_seqno = in_msg~load_uint(32);
+    int valid_until = in_msg~load_uint(32);
+    
+    ;; Load contract data
+    var (owner_address, recipient_address, jetton_master_address, vesting_total_amount, 
+        vesting_start_time, vesting_total_duration, unlock_period, cliff_duration, 
+        is_auto_claim, cancel_contract_permission, change_recipient_permission, 
+        claimed_amount, seqno, whitelist) = load_data();
+    
+    ;; Check sequence number
+    throw_unless(33, msg_seqno == seqno);
+    
+    ;; Check expiration
+    throw_if(34, valid_until <= now());
+    
+    ;; Accept message - this allows the contract to pay for gas
+    accept_message();
+    
+    ;; Parse operation (should be claim_unlocked)
+    int op = in_msg~load_uint(32);
+    throw_unless(error::invalid_op, op == op::claim_unlocked);
+    
+    int query_id = in_msg~load_uint(64);
+    int forward_ton_amount = in_msg~load_coins();
+    slice jetton_wallet_address = in_msg~load_msg_addr();
+
+    int unlocked_amount = calculate_unlocked_amount(vesting_total_amount, vesting_start_time, 
+        vesting_total_duration, unlock_period, cliff_duration, now());
+
+    int claimable_amount = unlocked_amount - claimed_amount;
+
+    throw_unless(error::invalid_amount, claimable_amount > 0);
+
+    ;; Create jetton transfer message - send to recipient_address
+    var msg = begin_cell()
+      .store_uint(0x18, 6)
+      .store_slice(jetton_wallet_address)
+      .store_coins(forward_ton_amount + gas::jetton_transfer) ;; gas
+      .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+      .store_ref(
+        begin_cell()
+          .store_uint(op::transfer, 32)
+          .store_uint(query_id, 64)
+          .store_coins(claimable_amount)
+          .store_slice(recipient_address)
+          .store_slice(recipient_address) ;; response destination is recipient
+          .store_uint(0, 1) ;; No custom payload
+          .store_coins(forward_ton_amount)
+          .store_uint(0, 1) ;; No forward payload
+        .end_cell()
+    );
+
+    send_raw_message(msg.end_cell(), send_mode::pay_gas_separately);
+
+    claimed_amount += claimable_amount;
+    seqno += 1; ;; Increment sequence number
+
+    save_data(owner_address, recipient_address, jetton_master_address, vesting_total_amount, 
+        vesting_start_time, vesting_total_duration, unlock_period, cliff_duration,
+        is_auto_claim, cancel_contract_permission, change_recipient_permission,
+        claimed_amount, seqno, whitelist);
 }
 
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
@@ -203,57 +294,107 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
   
     slice sender_addr = cs~load_msg_addr();
   
-    ;; Load contract data
-    var (owner_address, jetton_master_address, vesting_total_amount, vesting_start_time, vesting_total_duration,
-        unlock_period, cliff_duration, claimed_amount, whitelist) = load_data();
+    ;; Load contract data with updated parameters including seqno
+    var (owner_address, recipient_address, jetton_master_address, vesting_total_amount, 
+        vesting_start_time, vesting_total_duration, unlock_period, cliff_duration, 
+        is_auto_claim, cancel_contract_permission, change_recipient_permission, 
+        claimed_amount, seqno, whitelist) = load_data();
   
     int op = in_msg_body~load_uint(32);
     int query_id = in_msg_body~load_uint(64);
 
-    ;; Handle transfer_notification operation from jetton wallet
-    ;; if (op == op::transfer_notification) {
-    ;;     int jetton_amount = in_msg_body~load_coins();
-    ;;    slice from_address = in_msg_body~load_msg_addr();
+    ;; Handle cancel_vesting operation
+    if (op == op::cancel_vesting) {
+        ;; Check permission
+        throw_unless(error::access_denied, check_permission(sender_addr, owner_address, recipient_address, cancel_contract_permission));
         
-    ;;     ;; Update total amount
-    ;;     vesting_total_amount += jetton_amount;
-        
-    ;;     save_data(owner_address, jetton_master_address, vesting_total_amount, vesting_start_time, vesting_total_duration,
-    ;;         unlock_period, cliff_duration, claimed_amount, whitelist);
-    ;;     return ();
-    ;; }
+        int forward_ton_amount = in_msg_body~load_coins();
+        slice jetton_wallet_address = in_msg_body~load_msg_addr();
 
-    ;; Only owner can add to whitelist
+        ;; Calculate remaining tokens
+        int remaining_amount = vesting_total_amount - claimed_amount;
+        
+        ;; Send all remaining tokens to return_address
+        if (remaining_amount > 0) {
+            var msg = begin_cell()
+              .store_uint(0x18, 6)
+              .store_slice(jetton_wallet_address)
+              .store_coins(forward_ton_amount + gas::jetton_transfer) ;; gas
+              .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+              .store_ref(
+                begin_cell()
+                  .store_uint(op::transfer, 32)
+                  .store_uint(query_id, 64)
+                  .store_coins(remaining_amount)
+                  .store_slice(sender_addr)
+                  .store_slice(sender_addr) ;; response destination
+                  .store_uint(0, 1) ;; No custom payload
+                  .store_coins(forward_ton_amount) 
+                  .store_uint(0, 1) ;; No forward payload
+                .end_cell()
+            );
+            
+            send_raw_message(msg.end_cell(), send_mode::pay_gas_separately);
+        }
+        
+        ;; Mark contract as terminated by setting vesting_total_amount to claimed_amount
+        save_data(owner_address, recipient_address, jetton_master_address, claimed_amount,
+            vesting_start_time, vesting_total_duration, unlock_period, cliff_duration, 
+            is_auto_claim, cancel_contract_permission, change_recipient_permission, 
+            claimed_amount, seqno, whitelist);
+        
+        return ();
+    }
+
+    ;; change recipient
+    if (op == op::change_recipient) {
+        ;; Check permission
+        throw_unless(error::access_denied, 
+            check_permission(sender_addr, owner_address, recipient_address, change_recipient_permission));
+        
+        ;; Load new recipient address
+        slice new_recipient_address = in_msg_body~load_msg_addr();
+        
+        ;; Update recipient
+        save_data(owner_address, new_recipient_address, jetton_master_address, vesting_total_amount,
+            vesting_start_time, vesting_total_duration, unlock_period, cliff_duration, 
+            is_auto_claim, cancel_contract_permission, change_recipient_permission, 
+            claimed_amount, seqno, whitelist);
+        
+        return ();
+    }
+
+    ;; add to whitelist
     if (op == op::add_whitelist) {
-        throw_unless(error::not_owner, equal_slices(sender_addr, owner_address));
+        ;; Check if sender is owner
+        throw_unless(error::access_denied, equal_slices(sender_addr, owner_address));
     
         slice new_addr = in_msg_body~load_msg_addr();
         whitelist = add_to_whitelist(whitelist, new_addr);
     
-        save_data(owner_address, jetton_master_address, vesting_total_amount, vesting_start_time, vesting_total_duration,
-            unlock_period, cliff_duration, claimed_amount, whitelist);
+        save_data(owner_address, recipient_address, jetton_master_address, vesting_total_amount, 
+            vesting_start_time, vesting_total_duration, unlock_period, cliff_duration,
+            is_auto_claim, cancel_contract_permission, change_recipient_permission, 
+            claimed_amount, seqno, whitelist);
         return ();
     }
-    
-    if (op == op::excesses) {
-        return (); ;; Ignore excesses notifications
-    }
 
+    ;; claim unlocked
     if (op == op::claim_unlocked) {
-        ;; Only owner can claim unlocked tokens
-        throw_unless(error::not_owner, equal_slices(sender_addr, owner_address));
+        ;; Check if sender is recipient
+        throw_unless(error::access_denied, equal_slices(sender_addr, recipient_address));
         
         int forward_ton_amount = in_msg_body~load_coins();
         slice jetton_wallet_address = in_msg_body~load_msg_addr();
-    
+
         int unlocked_amount = calculate_unlocked_amount(vesting_total_amount, vesting_start_time, 
             vesting_total_duration, unlock_period, cliff_duration, now());
-    
+
         int claimable_amount = unlocked_amount - claimed_amount;
-    
+
         throw_unless(error::invalid_amount, claimable_amount > 0);
-    
-        ;; Create jetton transfer message
+
+        ;; Create jetton transfer message - now sending to recipient_address
         var msg = begin_cell()
           .store_uint(0x18, 6)
           .store_slice(jetton_wallet_address)
@@ -263,45 +404,44 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
             begin_cell()
               .store_uint(op::transfer, 32)
               .store_uint(query_id, 64)
-              .store_coins(claimable_amount) ;; Use claimable_amount
-              .store_slice(owner_address)
-              .store_slice(owner_address) ;; response destination
-              .store_uint(0, 1) ;; No custom payload
-              .store_coins(forward_ton_amount) ;; Forward ton amount 0.05
-              .store_uint(0, 1) ;; No forward payload
+              .store_coins(claimable_amount)
+              .store_slice(recipient_address)
+              .store_slice(sender_addr)
+              .store_uint(0, 1)
+              .store_coins(forward_ton_amount)
+              .store_uint(0, 1)
             .end_cell()
         );
-    
+
         send_raw_message(msg.end_cell(), send_mode::pay_gas_separately);
-    
+
         claimed_amount += claimable_amount;
-    
-        save_data(owner_address, jetton_master_address, vesting_total_amount, vesting_start_time, vesting_total_duration,
-            unlock_period, cliff_duration, claimed_amount, whitelist);
+
+        save_data(owner_address, recipient_address, jetton_master_address, vesting_total_amount, 
+            vesting_start_time, vesting_total_duration, unlock_period, cliff_duration,
+            is_auto_claim, cancel_contract_permission, change_recipient_permission,
+            claimed_amount, seqno, whitelist);
         return ();
     }
 
+    ;; send jettons
     if (op == op::send_jettons) {
-        ;; Only owner can initiate jetton send
-        throw_unless(error::not_owner, equal_slices(sender_addr, owner_address));
+        ;; Check if sender is owner
+        throw_unless(error::access_denied, equal_slices(sender_addr, owner_address));
     
         slice to_addr = in_msg_body~load_msg_addr();
         int jetton_amount = in_msg_body~load_coins();
         int forward_ton_amount = in_msg_body~load_coins();
         slice jetton_wallet_address = in_msg_body~load_msg_addr();
 
-        ;; Calculate locked amount
-        int locked_amount = calculate_locked_amount(vesting_total_amount, vesting_start_time, 
-            vesting_total_duration, unlock_period, cliff_duration, now());
-
-        ;; Verify transfer allowed - can only transfer unlocked tokens unless to whitelisted address
-        throw_unless(error::funds_locked, verify_jetton_transfer(to_addr, jetton_amount, locked_amount, whitelist, owner_address));
+        ;; Check if recipient is owner or whitelisted
+        throw_unless(error::access_denied, equal_slices(to_addr, owner_address) | is_whitelisted(to_addr, whitelist));
     
         ;; Create jetton transfer message
         var msg = begin_cell()
           .store_uint(0x18, 6)
           .store_slice(jetton_wallet_address)
-          .store_coins(forward_ton_amount + gas::jetton_transfer) ;; forward amount + gas
+          .store_coins(forward_ton_amount + gas::jetton_transfer)
           .store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1)
           .store_ref(
             begin_cell()
@@ -309,15 +449,19 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
               .store_uint(query_id, 64)
               .store_coins(jetton_amount)
               .store_slice(to_addr)
-              .store_slice(owner_address) ;; response destination
-              .store_uint(0, 1) ;; No custom payload
+              .store_slice(sender_addr)
+              .store_uint(0, 1)
               .store_coins(forward_ton_amount)
-              .store_uint(0, 1) ;; No forward payload
+              .store_uint(0, 1)
             .end_cell()
         );
         
         send_raw_message(msg.end_cell(), send_mode::pay_gas_separately);
         return ();
+    }
+
+    if (op == op::excesses) {
+        return (); ;; Ignore excesses notifications
     }
   
     ;; Unknown operation
@@ -325,24 +469,56 @@ int verify_jetton_transfer(slice to_addr, int amount, int locked_amount, cell wh
 }
 
 ;; Get vesting parameters
-(slice, slice, int, int, int, int, int, int, cell) get_vesting_data() method_id {
-    var (owner_address, jetton_master_address,vesting_total_amount, vesting_start_time, vesting_total_duration,
-        unlock_period, cliff_duration, claimed_amount, whitelist) = load_data();
-  
-    return (owner_address, jetton_master_address, vesting_total_amount, vesting_start_time, vesting_total_duration,
-        unlock_period, cliff_duration, claimed_amount, whitelist);
+(slice, slice, slice, int, int, int, int, int, int, int, int, int, int, cell) get_vesting_data() method_id {
+    return load_data();
 }
 
 ;; Get owner address
 slice get_owner() method_id {
-    var (owner_address, _, _, _, _, _, _, _, _) = load_data();
+    var (owner_address, _, _, _, _, _, _, _, _, _, _, _, _, _) = load_data();
     return owner_address;
+}
+
+;; Get recipient address
+slice get_recipient() method_id {
+    var (_, recipient_address, _, _, _, _, _, _, _, _, _, _, _, _) = load_data();
+    return recipient_address;
+}
+
+;; Get cancel permission
+int get_cancel_contract_permission() method_id {
+    var (_, _, _, _, _, _, _, _, _, cancel_contract_permission, _, _, _, _) = load_data();
+    return cancel_contract_permission;
+}
+
+;; Get change recipient permission
+int get_change_recipient_permission() method_id {
+    var (_, _, _, _, _, _, _, _, _, _, change_recipient_permission, _, _, _) = load_data();
+    return change_recipient_permission;
+}
+
+;; Get auto claim flag
+int get_is_auto_claim() method_id {
+    var (_, _, _, _, _, _, _, _, is_auto_claim, _, _, _, _, _) = load_data();
+    return is_auto_claim;
+}
+
+;; Check if a specific address can cancel the contract
+int can_cancel_contract(slice address) method_id {
+    var (owner_address, recipient_address, _, _, _, _, _, _, _, cancel_contract_permission, _, _, _, _) = load_data();
+    return check_permission(address, owner_address, recipient_address, cancel_contract_permission);
+}
+
+;; Check if a specific address can change the recipient
+int can_change_recipient(slice address) method_id {
+    var (owner_address, recipient_address, _, _, _, _, _, _, _, _, change_recipient_permission, _, _, _) = load_data();
+    return check_permission(address, owner_address, recipient_address, change_recipient_permission);
 }
 
 ;; Get locked amount at a specific time
 int get_locked_amount(int at_time) method_id {
-    var (_, _, vesting_total_amount, vesting_start_time, vesting_total_duration, 
-        unlock_period, cliff_duration, _, _) = load_data();
+    var (_, _, _, vesting_total_amount, vesting_start_time, vesting_total_duration, 
+        unlock_period, cliff_duration, _, _, _, _, _, _) = load_data();
   
     return calculate_locked_amount(vesting_total_amount, vesting_start_time, 
         vesting_total_duration, unlock_period, cliff_duration, at_time);
@@ -350,8 +526,8 @@ int get_locked_amount(int at_time) method_id {
 
 ;; Get unlocked amount at a specific time
 int get_unlocked_amount(int at_time) method_id {
-    var (_, _, vesting_total_amount, vesting_start_time, vesting_total_duration, 
-        unlock_period, cliff_duration, _, _) = load_data();
+    var (_, _, _, vesting_total_amount, vesting_start_time, vesting_total_duration, 
+        unlock_period, cliff_duration, _, _, _, _, _, _) = load_data();
   
     return calculate_unlocked_amount(vesting_total_amount, vesting_start_time, 
         vesting_total_duration, unlock_period, cliff_duration, at_time);
@@ -369,14 +545,14 @@ int get_current_unlocked_amount() method_id {
 
 ;; Get claimed amount
 int get_claimed_amount() method_id {
-    var (_, _, _, _, _, _, _, claimed_amount, _) = load_data();
+    var (_, _, _, _, _, _, _, _, _, _, _, claimed_amount, _, _) = load_data();
     return claimed_amount;
 }
 
 ;; Get claimable amount
 int get_claimable_amount() method_id {
-    var (_, _, vesting_total_amount, vesting_start_time, vesting_total_duration, 
-        unlock_period, cliff_duration, claimed_amount, _) = load_data();
+    var (_, _, _, vesting_total_amount, vesting_start_time, vesting_total_duration, 
+        unlock_period, cliff_duration, _, _, _, claimed_amount, _, _) = load_data();
     
     int unlocked_amount = calculate_unlocked_amount(vesting_total_amount, vesting_start_time, 
         vesting_total_duration, unlock_period, cliff_duration, now());
@@ -384,16 +560,15 @@ int get_claimable_amount() method_id {
     return unlocked_amount - claimed_amount;
 }
 
-
 ;; Check if address is whitelisted
 int get_is_whitelisted(slice address) method_id {
-    var (_, _, _, _, _, _, _, _, whitelist) = load_data();
+    var (_, _, _, _, _, _, _, _, _, _, _, _, _, whitelist) = load_data();
     return is_whitelisted(address, whitelist);
 }
 
 ;; Get whitelist as list of (wc, hash_part) tuples
 tuple get_whitelist() method_id {
-    var (_, _, _, _, _, _, _, _, whitelist) = load_data();
+    var (_, _, _, _, _, _, _, _, _, _, _, _, _, whitelist) = load_data();
     var list = null();
     
     cell d = whitelist;
@@ -410,6 +585,11 @@ tuple get_whitelist() method_id {
 
 ;; Get vesting total amount directly
 int get_vesting_total_amount() method_id {
-    var (_, _, vesting_total_amount, _, _, _, _, _, _) = load_data();
+    var (_, _, _, vesting_total_amount, _, _, _, _, _, _, _, _, _, _) = load_data();
     return vesting_total_amount;
+}
+
+int get_seqno() method_id {
+    var (_, _, _, _, _, _, _, _, _, _, _, _, seqno, _) = load_data();
+    return seqno;
 }

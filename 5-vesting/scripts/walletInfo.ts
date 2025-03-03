@@ -31,39 +31,32 @@ export async function run(provider: NetworkProvider) {
     const walletAddress = Address.parse(WALLET_ADDRESS);
     const vestingWallet = provider.open(VestingWallet.createFromAddress(walletAddress));
     
-    // Bilgileri al
     const vestingData = await vestingWallet.getVestingData();
     console.log("vestingData", vestingData);
+
     const owner = await vestingWallet.getOwner();
     console.log("owner", owner);
+
+    const cancelContractPermission = await vestingWallet.getCancelContractPermission();
+    console.log("cancelContractPermission", cancelContractPermission);
+
+    const changeRecipientPermission = await vestingWallet.getChangeRecipientPermission();
+    console.log("changeRecipientPermission", changeRecipientPermission);
+
+    const isAutoClaim = await vestingWallet.getIsAutoClaim();
+    console.log("isAutoClaim", isAutoClaim);
+
     const currentUnlocked = await vestingWallet.getCurrentUnlockedAmount();
     console.log("currentUnlocked", currentUnlocked);
+
     const currentLocked = await vestingWallet.getCurrentLockedAmount();
     console.log("currentLocked", currentLocked);
+
     const claimedAmount = await vestingWallet.getClaimedAmount();
     console.log("claimedAmount", claimedAmount);
+
     const claimableAmount = await vestingWallet.getClaimableAmount();
     console.log("claimableAmount", claimableAmount);
-    
-    // Jetton wallet adresini al
-    let jettonWalletAddress;
-    try {
-      jettonWalletAddress = await vestingWallet.getJettonWalletAddress();
-    } catch (e) {
-      jettonWalletAddress = "Could not retrieve jetton wallet address";
-    }
-    
-    console.log('\n===== VESTING WALLET INFORMATION =====');
-    console.log('Wallet Address:', walletAddress.toString());
-    console.log('Owner Address:', owner.toString());
-    console.log('Jetton Master:', vestingData.jettonMasterAddress.toString());
-    
-    if (typeof jettonWalletAddress !== "string") {
-      console.log('Jetton Wallet:', jettonWalletAddress.toString());
-    } else {
-      console.log('Jetton Wallet:', jettonWalletAddress);
-    }
-  
     
     console.log('\n--- Vesting Schedule ---');
     console.log('Start Time:', formatDate(vestingData.vestingStartTime));
@@ -98,6 +91,9 @@ export async function run(provider: NetworkProvider) {
         totalDuration: vestingData.vestingTotalDuration,
         unlockPeriod: vestingData.unlockPeriod,
         cliffDuration: vestingData.cliffDuration,
+        isAutoClaim: isAutoClaim,
+        cancelContractPermission: cancelContractPermission,
+        changeRecipientPermission: changeRecipientPermission,
         locked: fromNano(currentLocked),
         unlocked: fromNano(currentUnlocked),
         claimed: fromNano(claimedAmount),

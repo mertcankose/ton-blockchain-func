@@ -31,6 +31,8 @@ export const VestingWalletOpcodes = {
   send_jettons: 0x7777,
   report_status: 0x7fee,
   claim_unlocked: 0x8888,
+  cancel_vesting: 0x9999,
+  change_recipient: 0xaaaa,
 } as const;
 
 export type VestingWalletConfig = {
@@ -72,8 +74,7 @@ export function vestingWalletConfigToCell(config: VestingWalletConfig): Cell {
     .storeAddress(config.jetton_master_address)
     .storeCoins(config.vesting_total_amount)
     .storeUint(packedParams, 128)
-    .storeCoins(config.claimed_amount)
-
+    .storeCoins(config.claimed_amount);
 
   return cell.endCell();
 }
@@ -170,23 +171,25 @@ export class VestingWallet implements Contract {
       value,
       sendMode: SendMode.PAY_GAS_SEPARATELY,
       body: beginCell()
-      .storeUint(VestingWalletOpcodes.send_jettons, 32)
-      .storeUint(queryId, 64)
-      .storeAddress(opts.toAddress)
-      .storeCoins(opts.jettonAmount)
-      .storeCoins(opts.forwardTonAmount)
-      .storeAddress(opts.jettonWalletAddress)
-      .endCell(),
+        .storeUint(VestingWalletOpcodes.send_jettons, 32)
+        .storeUint(queryId, 64)
+        .storeAddress(opts.toAddress)
+        .storeCoins(opts.jettonAmount)
+        .storeCoins(opts.forwardTonAmount)
+        .storeAddress(opts.jettonWalletAddress)
+        .endCell(),
     });
   }
 
-  async claimUnlocked(provider: ContractProvider, via: Sender,
+  async claimUnlocked(
+    provider: ContractProvider,
+    via: Sender,
     opts: {
-      forwardTonAmount: bigint,
-      jettonWalletAddress: Address,
+      forwardTonAmount: bigint;
+      jettonWalletAddress: Address;
     }
   ) {
-    const queryId = 1n
+    const queryId = 1n;
 
     const value = opts.forwardTonAmount + toNano("0.05");
 
@@ -194,11 +197,11 @@ export class VestingWallet implements Contract {
       value,
       sendMode: SendMode.PAY_GAS_SEPARATELY,
       body: beginCell()
-      .storeUint(VestingWalletOpcodes.claim_unlocked, 32)
-      .storeUint(queryId, 64)
-      .storeCoins(opts.forwardTonAmount)
-      .storeAddress(opts.jettonWalletAddress)
-      .endCell(),
+        .storeUint(VestingWalletOpcodes.claim_unlocked, 32)
+        .storeUint(queryId, 64)
+        .storeCoins(opts.forwardTonAmount)
+        .storeAddress(opts.jettonWalletAddress)
+        .endCell(),
     });
   }
 
@@ -221,20 +224,64 @@ export class VestingWallet implements Contract {
     });
   }
 
+  // cancelVesting
+  async cancelVesting(provider: ContractProvider, via: Sender,
+    opts: {
+      forwardTonAmount: bigint;
+      jettonWalletAddress: Address;
+    }
+  ) {
+    const queryId = 20
+
+    return await provider.internal(via, {
+      value: toNano("0.05"),
+      sendMode: SendMode.PAY_GAS_SEPARATELY,
+      body: beginCell()
+        .storeUint(VestingWalletOpcodes.cancel_vesting, 32)
+        .storeUint(queryId, 64)
+        .storeCoins(opts.forwardTonAmount)
+        .storeAddress(opts.jettonWalletAddress)
+        .endCell(),
+    });
+  }
+
+  // changeRecipient
+  async changeRecipient(provider: ContractProvider, via: Sender,
+    opts: {
+      newRecipientAddress: Address;
+    }
+  ) {
+    const queryId = 21
+
+    return await provider.internal(via, {
+      value: toNano("0.05"),
+      sendMode: SendMode.PAY_GAS_SEPARATELY,
+      body: beginCell()
+        .storeUint(VestingWalletOpcodes.change_recipient, 32)
+        .storeUint(queryId, 64)
+        .storeAddress(opts.newRecipientAddress)
+        .endCell(),
+    });
+  }
+
   // Get vesting data
   async getVestingData(provider: ContractProvider) {
     const result = await provider.get("get_vesting_data", []);
 
     return {
       ownerAddress: result.stack.readAddress(),
+      recipientAddress: result.stack.readAddress(),
       jettonMasterAddress: result.stack.readAddress(),
-      vestingTotalAmount: result.stack.readBigNumber(), 
+      vestingTotalAmount: result.stack.readBigNumber(),
       vestingStartTime: result.stack.readNumber(),
       vestingTotalDuration: result.stack.readNumber(),
       unlockPeriod: result.stack.readNumber(),
       cliffDuration: result.stack.readNumber(),
+      isAutoClaim: result.stack.readNumber(),
+      cancelContractPermission: result.stack.readNumber(),
+      changeRecipientPermission: result.stack.readNumber(),
       claimedAmount: result.stack.readBigNumber(),
-      // whitelist: result.stack.readCell(),
+      whitelist: result.stack.readCell(),
     };
   }
 
@@ -242,6 +289,37 @@ export class VestingWallet implements Contract {
   async getOwner(provider: ContractProvider) {
     const result = await provider.get("get_owner", []);
     return result.stack.readAddress();
+  }
+
+  async getCancelContractPermission(provider: ContractProvider) {
+    const result = await provider.get("get_cancel_contract_permission", []);
+    return result.stack.readNumber();
+  }
+
+  async getChangeRecipientPermission(provider: ContractProvider) {
+    const result = await provider.get("get_change_recipient_permission", []);
+    return result.stack.readNumber();
+  }
+
+  async getIsAutoClaim(provider: ContractProvider) {
+    const result = await provider.get("get_is_auto_claim", []);
+    return result.stack.readNumber();
+  }
+
+  // take address parameter
+  async canCancelContract(provider: ContractProvider, address: Address) {
+    const result = await provider.get("can_cancel_contract", [
+      { type: "slice", cell: beginCell().storeAddress(address).endCell() },
+    ]);
+    return result.stack.readNumber();
+  }
+
+  // take address parameter
+  async canChangeRecipient(provider: ContractProvider, address: Address) {
+    const result = await provider.get("can_change_recipient", [
+      { type: "slice", cell: beginCell().storeAddress(address).endCell() },
+    ]);
+    return result.stack.readNumber();
   }
 
   // Get locked amount at a specific time
@@ -298,15 +376,13 @@ export class VestingWallet implements Contract {
     return result.stack.readTuple();
   }
 
-  // Get jetton wallet address for this vesting contract
-  async getJettonWalletAddress(provider: ContractProvider) {
-    const result = await provider.get("get_jetton_wallet_address", []);
-    return result.stack.readAddress();
-  }
-
   async getVestingTotalAmount(provider: ContractProvider) {
     const result = await provider.get("get_vesting_total_amount", []);
     return result.stack.readBigNumber();
   }
-  
+
+  async getSeqno(provider: ContractProvider) {
+    const result = await provider.get("get_seqno", []);
+    return result.stack.readNumber();
+  }
 }
