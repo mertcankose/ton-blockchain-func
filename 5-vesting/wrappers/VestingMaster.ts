@@ -23,6 +23,7 @@ export const VestingMasterOpcodes = {
 export type VestingMasterConfig = {
   owner_address: Address;
   vesting_wallet_code: Cell;
+  logger_address: Address;
   total_wallets_created: number;
   total_royalty_collected: bigint;
 };
@@ -31,6 +32,7 @@ export function vestingMasterConfigToCell(config: VestingMasterConfig): Cell {
   return beginCell()
     .storeAddress(config.owner_address)
     .storeRef(config.vesting_wallet_code)
+    .storeAddress(config.logger_address)
     .storeUint(config.total_wallets_created, 64)
     .storeCoins(config.total_royalty_collected)
     .endCell();
@@ -60,7 +62,6 @@ export class VestingMaster implements Contract {
     });
   }
 
-  // Create a new vesting wallet
   async sendCreateVestingWallet(
     provider: ContractProvider,
     via: Sender,
@@ -76,34 +77,39 @@ export class VestingMaster implements Contract {
       unlockPeriod: number;
       cliffDuration: number;
       isAutoClaim: number;
-      forwardRemainingBalance: bigint;
       cancelContractPermission: number;
       changeRecipientPermission: number;
+      forwardRemainingBalance: bigint;
     }
   ) {
+    const mainCell = beginCell()
+      .storeUint(VestingMasterOpcodes.create_vesting_wallet, 32)
+      .storeUint(opts.queryId, 64)
+      .storeAddress(opts.owner)
+      .storeAddress(opts.recipient)
+      .storeAddress(opts.jettonMaster)
+      .storeCoins(opts.vestingTotalAmount);
+    
+    const refCell = beginCell()
+      .storeUint(opts.startTime, 32)
+      .storeUint(opts.totalDuration, 32)
+      .storeUint(opts.unlockPeriod, 32)
+      .storeUint(opts.cliffDuration, 32)
+      .storeUint(opts.isAutoClaim, 1)
+      .storeUint(opts.cancelContractPermission, 3)
+      .storeUint(opts.changeRecipientPermission, 3)
+      .storeCoins(opts.forwardRemainingBalance)
+      .endCell();
+    
+    const msgBody = mainCell.storeRef(refCell).endCell();
+  
     return await provider.internal(via, {
       value: opts.value,
       sendMode: SendMode.PAY_GAS_SEPARATELY,
-      body: beginCell()
-        .storeUint(VestingMasterOpcodes.create_vesting_wallet, 32)
-        .storeUint(opts.queryId, 64)
-        .storeAddress(opts.owner)
-        .storeAddress(opts.recipient)
-        .storeAddress(opts.jettonMaster)
-        .storeCoins(opts.vestingTotalAmount)
-        .storeUint(opts.startTime, 32)
-        .storeUint(opts.totalDuration, 32)
-        .storeUint(opts.unlockPeriod, 32)
-        .storeUint(opts.cliffDuration, 32)
-        .storeUint(opts.isAutoClaim, 1)
-        .storeUint(opts.cancelContractPermission, 32)
-        .storeUint(opts.changeRecipientPermission, 32)
-        .storeCoins(opts.forwardRemainingBalance)
-        .endCell(),
+      body: msgBody
     });
   }
 
-  // Request a wallet address
   async sendProvideWalletAddress(
     provider: ContractProvider,
     via: Sender,
@@ -123,7 +129,7 @@ export class VestingMaster implements Contract {
     }
   ) {
     const queryId = BigInt(Math.floor(Math.random() * 10000000000));
-
+  
     const msgBody = beginCell()
       .storeUint(VestingMasterOpcodes.provide_wallet_address, 32)
       .storeUint(queryId, 64)
@@ -136,11 +142,11 @@ export class VestingMaster implements Contract {
       .storeUint(opts.totalDuration, 32)
       .storeUint(opts.unlockPeriod, 32)
       .storeUint(opts.cliffDuration, 32)
-      .storeUint(opts.isAutoClaim, 32)
-      .storeUint(opts.cancelContractPermission, 32)
-      .storeUint(opts.changeRecipientPermission, 32)
+      .storeUint(opts.isAutoClaim, 1)
+      .storeUint(opts.cancelContractPermission, 3)
+      .storeUint(opts.changeRecipientPermission, 3)
       .endCell()
-
+  
     return await provider.internal(via, {
       value: toNano("0.05"),
       sendMode: SendMode.PAY_GAS_SEPARATELY,
@@ -232,25 +238,32 @@ export class VestingMaster implements Contract {
     };
   }
 
-  // Get wallet address for params - Updated to include vestingTotalAmount
   async getWalletAddress(
     provider: ContractProvider,
     owner: Address,
+    recipient: Address, // Added recipient parameter
     jettonMaster: Address,
     vestingTotalAmount: bigint,
     startTime: number,
     totalDuration: number,
     unlockPeriod: number,
-    cliffDuration: number
+    cliffDuration: number,
+    isAutoClaim: number,
+    cancelContractPermission: number,
+    changeRecipientPermission: number
   ) {
     const result = await provider.get("get_wallet_address", [
       { type: "slice", cell: beginCell().storeAddress(owner).endCell() },
+      { type: "slice", cell: beginCell().storeAddress(recipient).endCell() },
       { type: "slice", cell: beginCell().storeAddress(jettonMaster).endCell() },
       { type: "int", value: BigInt(vestingTotalAmount) },
       { type: "int", value: BigInt(startTime) },
       { type: "int", value: BigInt(totalDuration) },
       { type: "int", value: BigInt(unlockPeriod) },
       { type: "int", value: BigInt(cliffDuration) },
+      { type: "int", value: BigInt(isAutoClaim) },
+      { type: "int", value: BigInt(cancelContractPermission) },
+      { type: "int", value: BigInt(changeRecipientPermission) },
     ]);
     return result.stack.readAddress();
   }

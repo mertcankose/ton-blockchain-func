@@ -1,4 +1,5 @@
 #include "imports/stdlib.fc";
+#include "imports/utils.fc";
 
 ;; Operations
 const int op::register_wallet = 0xd1d1d1d1;
@@ -9,42 +10,89 @@ const int op::log_cancel = 0xd4d4d4d4;
 ;; Error codes
 const int error::access_denied = 0x1001;
 
+;; Define global variables for storage
+global slice storage::owner;
+global cell storage::token_wallets;
+global cell storage::owner_wallets;
+global cell storage::receiver_wallets;
+global cell storage::auto_claim_wallets;
+global int storage::init?;
+
 ;; Helper to compare two addresses
 int equal_slices(slice a, slice b) {
     return a.slice_hash() == b.slice_hash();
 }
 
-;; Storage structure:
-;; storage#_ owner:MsgAddress
-;;           token_wallets:(HashmapE 267 ^(HashmapE 267 True))  ;; Token address -> list of wallets
-;;           owner_wallets:(HashmapE 267 ^(HashmapE 267 True))  ;; Owner address -> list of wallets
-;;           receiver_wallets:(HashmapE 267 ^(HashmapE 267 True))  ;; Receiver address -> list of wallets
-;;           auto_claim_wallets:(HashmapE 267 True)  ;; Wallets with auto claim enabled
-;;           = Storage;
-
-(slice, cell, cell, cell, cell) load_data() inline {
-    var ds = get_data().begin_parse();
-    if (ds.slice_empty?()) {
-        return (null(), new_dict(), new_dict(), new_dict(), new_dict());
+;; Load data into global variables
+() load_data() impure inline {
+    slice ds = get_data().begin_parse();
+    
+    ;; Check if data cell is empty
+    if (ds.slice_bits() == 0) {
+        storage::owner = null();
+        storage::token_wallets = new_dict();
+        storage::owner_wallets = new_dict();
+        storage::receiver_wallets = new_dict();
+        storage::auto_claim_wallets = new_dict();
+        storage::init? = false;
+        return ();
     }
     
-    slice owner = ds~load_msg_addr();
-    cell token_wallets = ds~load_dict();
-    cell owner_wallets = ds~load_dict();
-    cell receiver_wallets = ds~load_dict();
-    cell auto_claim_wallets = ds~load_dict();
+    ;; Load owner address
+    storage::owner = ds~load_msg_addr();
+    storage::init? = true;
     
-    return (owner, token_wallets, owner_wallets, receiver_wallets, auto_claim_wallets);
+    ;; Check if we have more data
+    if (ds.slice_refs() < 1) {
+        storage::token_wallets = new_dict();
+        storage::owner_wallets = new_dict();
+        storage::receiver_wallets = new_dict();
+        storage::auto_claim_wallets = new_dict();
+        return ();
+    }
+    
+    ;; Load token wallets dictionary
+    storage::token_wallets = ds~load_dict();
+    
+    ;; Check if we have more refs
+    if (ds.slice_refs() < 1) {
+        storage::owner_wallets = new_dict();
+        storage::receiver_wallets = new_dict();
+        storage::auto_claim_wallets = new_dict();
+        return ();
+    }
+    
+    ;; Load owner wallets dictionary
+    storage::owner_wallets = ds~load_dict();
+    
+    ;; Check if we have more refs
+    if (ds.slice_refs() < 1) {
+        storage::receiver_wallets = new_dict();
+        storage::auto_claim_wallets = new_dict();
+        return ();
+    }
+    
+    ;; Load receiver wallets dictionary
+    storage::receiver_wallets = ds~load_dict();
+    
+    ;; Check if we have the final ref
+    if (ds.slice_refs() < 1) {
+        storage::auto_claim_wallets = new_dict();
+        return ();
+    }
+    
+    ;; Load auto claim wallets dictionary
+    storage::auto_claim_wallets = ds~load_dict();
 }
 
-() save_data(slice owner, cell token_wallets, cell owner_wallets, 
-    cell receiver_wallets, cell auto_claim_wallets) impure inline {
+;; Save data from global variables
+() save_data() impure inline {
     set_data(begin_cell()
-        .store_slice(owner)
-        .store_dict(token_wallets)
-        .store_dict(owner_wallets)
-        .store_dict(receiver_wallets)
-        .store_dict(auto_claim_wallets)
+        .store_slice(storage::owner)
+        .store_dict(storage::token_wallets)
+        .store_dict(storage::owner_wallets)
+        .store_dict(storage::receiver_wallets)
+        .store_dict(storage::auto_claim_wallets)
         .end_cell());
 }
 
@@ -80,13 +128,15 @@ cell add_to_index(cell index_dict, slice key_address, slice wallet_address) inli
     int op = in_msg_body~load_uint(32);
     int query_id = in_msg_body~load_uint(64);
     
-    var (owner, token_wallets, owner_wallets, receiver_wallets, auto_claim_wallets) = load_data();
+    ;; Load data into global variables
+    load_data();
     
-    if (owner.preload_uint(2) == 0) {
-        owner = sender_addr;
+    if (storage::owner.preload_uint(2) == 0) {
+        storage::owner = sender_addr;
+        storage::init? = true;
     }
     
-    throw_unless(error::access_denied, equal_slices(sender_addr, owner));
+    throw_unless(error::access_denied, equal_slices(sender_addr, storage::owner));
     
     if (op == op::register_wallet) {
         ;; Register a new vesting wallet
@@ -97,22 +147,22 @@ cell add_to_index(cell index_dict, slice key_address, slice wallet_address) inli
         int is_auto_claim = in_msg_body~load_uint(32);
         
         ;; Update token -> wallets mapping
-        token_wallets = add_to_index(token_wallets, token_address, wallet_address);
+        storage::token_wallets = add_to_index(storage::token_wallets, token_address, wallet_address);
         
         ;; Update owner -> wallets mapping
-        owner_wallets = add_to_index(owner_wallets, wallet_owner_address, wallet_address);
+        storage::owner_wallets = add_to_index(storage::owner_wallets, wallet_owner_address, wallet_address);
         
         ;; Update receiver -> wallets mapping
-        receiver_wallets = add_to_index(receiver_wallets, receiver_address, wallet_address);
+        storage::receiver_wallets = add_to_index(storage::receiver_wallets, receiver_address, wallet_address);
         
         ;; Update auto claim list if needed
         if (is_auto_claim) {
             (int wallet_wc, int wallet_hash) = parse_std_addr(wallet_address);
-            auto_claim_wallets~udict_set_builder(267, wallet_hash, begin_cell().store_int(-1, 1));
+            storage::auto_claim_wallets~udict_set_builder(267, wallet_hash, begin_cell().store_int(-1, 1));
         }
         
         ;; Save updated data
-        save_data(owner, token_wallets, owner_wallets, receiver_wallets, auto_claim_wallets);
+        save_data();
         return ();
     }
     
@@ -124,7 +174,7 @@ cell add_to_index(cell index_dict, slice key_address, slice wallet_address) inli
         
         ;; Remove wallet from old receiver's list
         (int old_wc, int old_hash) = parse_std_addr(old_receiver);
-        (slice old_list_slice, int old_found) = receiver_wallets.udict_get?(267, old_hash);
+        (slice old_list_slice, int old_found) = storage::receiver_wallets.udict_get?(267, old_hash);
         
         if (old_found) {
             cell old_dict = old_list_slice.preload_ref();
@@ -134,14 +184,14 @@ cell add_to_index(cell index_dict, slice key_address, slice wallet_address) inli
             (_, int was_found) = old_dict.udict_delete?(267, wallet_hash);
             
             ;; Update receiver wallets
-            receiver_wallets~udict_set_ref(267, old_hash, old_dict);
+            storage::receiver_wallets~udict_set_ref(267, old_hash, old_dict);
         }
         
         ;; Add wallet to new receiver's list
-        receiver_wallets = add_to_index(receiver_wallets, new_receiver, wallet_address);
+        storage::receiver_wallets = add_to_index(storage::receiver_wallets, new_receiver, wallet_address);
         
         ;; Save updated data
-        save_data(owner, token_wallets, owner_wallets, receiver_wallets, auto_claim_wallets);
+        save_data();
         return ();
     }
     
@@ -170,10 +220,14 @@ cell add_to_index(cell index_dict, slice key_address, slice wallet_address) inli
 
 ;; Get all wallets for a token
 cell get_token_wallets(slice token_address) method_id {
-    var (_, token_wallets, _, _, _) = load_data();
+    load_data();
+    
+    if (~ storage::init?) {
+        return new_dict();
+    }
     
     (int wc, int addr_hash) = parse_std_addr(token_address);
-    (slice token_list_slice, int token_found) = token_wallets.udict_get?(267, addr_hash);
+    (slice token_list_slice, int token_found) = storage::token_wallets.udict_get?(267, addr_hash);
     
     if (~ token_found) {
         return new_dict();
@@ -184,10 +238,14 @@ cell get_token_wallets(slice token_address) method_id {
 
 ;; Get all wallets for an owner
 cell get_owner_wallets(slice owner_address) method_id {
-    var (_, _, owner_wallets, _, _) = load_data();
+    load_data();
+    
+    if (~ storage::init?) {
+        return new_dict();
+    }
     
     (int wc, int addr_hash) = parse_std_addr(owner_address);
-    (slice owner_list_slice, int owner_found) = owner_wallets.udict_get?(267, addr_hash);
+    (slice owner_list_slice, int owner_found) = storage::owner_wallets.udict_get?(267, addr_hash);
     
     if (~ owner_found) {
         return new_dict();
@@ -198,10 +256,14 @@ cell get_owner_wallets(slice owner_address) method_id {
 
 ;; Get all wallets for a receiver
 cell get_receiver_wallets(slice receiver_address) method_id {
-    var (_, _, _, receiver_wallets, _) = load_data();
+    load_data();
+    
+    if (~ storage::init?) {
+        return new_dict();
+    }
     
     (int wc, int addr_hash) = parse_std_addr(receiver_address);
-    (slice receiver_list_slice, int receiver_found) = receiver_wallets.udict_get?(267, addr_hash);
+    (slice receiver_list_slice, int receiver_found) = storage::receiver_wallets.udict_get?(267, addr_hash);
     
     if (~ receiver_found) {
         return new_dict();
@@ -212,12 +274,17 @@ cell get_receiver_wallets(slice receiver_address) method_id {
 
 ;; Get all wallets with auto claim enabled
 cell get_auto_claim_wallets() method_id {
-    var (_, _, _, _, auto_claim_wallets) = load_data();
-    return auto_claim_wallets;
+    load_data();
+    
+    if (~ storage::init?) {
+        return new_dict();
+    }
+    
+    return storage::auto_claim_wallets;
 }
 
 ;; Get logger owner
 slice get_owner() method_id {
-    var (owner, _, _, _, _) = load_data();
-    return owner;
+    load_data();
+    return storage::owner;
 }

@@ -1,9 +1,8 @@
-// scripts/update-wallet-code.ts
 import { Address } from '@ton/core';
 import { VestingMaster } from '../wrappers/VestingMaster';
 import { compile, NetworkProvider } from '@ton/blueprint';
 
-const MASTER_CONTRACT_ADDRESS = "EQAOLJnZaOfOwnsYj18bujPzbsTdWgQdF-FTXkUKT-N-5uci";
+const MASTER_CONTRACT_ADDRESS = "EQCm5hC2k9cbF45MLggmNVh-WBmM0pZmixhj4iFXgttgDX5s";
 
 const NEW_WALLET_CODE_PATH = "VestingWallet"; 
 

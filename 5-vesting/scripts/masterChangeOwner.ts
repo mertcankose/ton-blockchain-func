@@ -1,9 +1,8 @@
-// scripts/change-master-owner.ts
 import { Address } from '@ton/core';
 import { VestingMaster } from '../wrappers/VestingMaster';
 import { NetworkProvider } from '@ton/blueprint';
 
-const MASTER_CONTRACT_ADDRESS = "EQAOLJnZaOfOwnsYj18bujPzbsTdWgQdF-FTXkUKT-N-5uci";
+const MASTER_CONTRACT_ADDRESS = "EQCm5hC2k9cbF45MLggmNVh-WBmM0pZmixhj4iFXgttgDX5s";
 
 const NEW_OWNER_ADDRESS = "0QARfBT9PMJ_TjX8bUqFvI-ZMqixM7kY68_-7tmVm-khfOyj";
 

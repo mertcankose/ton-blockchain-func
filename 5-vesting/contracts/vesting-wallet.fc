@@ -1,4 +1,6 @@
 #include "imports/stdlib.fc";
+#include "imports/utils.fc";
+
 
 ;; Jetton Standard Operations (TEP-74)
 const int op::transfer = 0xf8a7ea5;
@@ -86,9 +88,9 @@ int equal_slices(slice a, slice b) {
     slice jetton_master_address = ds~load_msg_addr();
     int vesting_total_amount = ds~load_coins();
     int packed_params = ds~load_uint(128);
-    int is_auto_claim = ds~load_uint(32);
-    int cancel_contract_permission = ds~load_uint(32);
-    int change_recipient_permission = ds~load_uint(32);
+    int is_auto_claim = ds~load_uint(1);
+    int cancel_contract_permission = ds~load_uint(3);
+    int change_recipient_permission = ds~load_uint(3);
     int claimed_amount = ds~load_coins();
     int seqno = ds~load_uint(32);
     
@@ -133,9 +135,9 @@ int equal_slices(slice a, slice b) {
         .store_slice(jetton_master_address)
         .store_coins(vesting_total_amount)
         .store_uint(packed_params, 128)
-        .store_uint(is_auto_claim, 32)
-        .store_uint(cancel_contract_permission, 32)
-        .store_uint(change_recipient_permission, 32)
+        .store_uint(is_auto_claim, 1)
+        .store_uint(cancel_contract_permission, 3)
+        .store_uint(change_recipient_permission, 3)
         .store_coins(claimed_amount)
         .store_uint(seqno, 32)
         .end_cell()
@@ -204,13 +206,10 @@ int calculate_locked_amount(int vesting_total_amount, int vesting_start_time, in
         is_auto_claim, cancel_contract_permission, change_recipient_permission, 
         claimed_amount, seqno) = load_data();
     
-    ;; Check sequence number
     throw_unless(33, msg_seqno == seqno);
     
-    ;; Check expiration
     throw_if(34, valid_until <= now());
     
-    ;; Accept message - this allows the contract to pay for gas
     accept_message();
     
     ;; Parse operation (should be claim_unlocked)

@@ -11,30 +11,20 @@ import {
 } from "@ton/core";
 
 export const VestingLoggerOpcodes = {
-  register_wallet: 0x5fe9b8cd,
-  update_recipient: 0x2c76b973,
-  log_claim: 0xd1735400,
-  log_cancel: 0xd374ab1c,
+  register_wallet: 0xd1d1d1d1,
+  update_recipient: 0xd2d2d2d2,
+  log_claim: 0xd3d3d3d3,
+  log_cancel: 0xd4d4d4d4,
 } as const;
 
 export type VestingLoggerConfig = {
   owner_address: Address;
-  whitelist: Cell;
-  token_wallets: Cell;
-  owner_wallets: Cell;
-  receiver_wallets: Cell;
-  auto_claim_wallets: Cell;
 };
 
 export function vestingLoggerConfigToCell(config: VestingLoggerConfig): Cell {
-  return beginCell()
-    .storeAddress(config.owner_address)
-    .storeRef(config.whitelist)
-    .storeRef(config.token_wallets)
-    .storeRef(config.owner_wallets)
-    .storeRef(config.receiver_wallets)
-    .storeRef(config.auto_claim_wallets)
-    .endCell();
+  // Simplified data structure - just store the owner address
+  // The contract will initialize empty dictionaries
+  return beginCell().storeAddress(config.owner_address).endCell();
 }
 
 export class VestingLogger implements Contract {
@@ -47,7 +37,11 @@ export class VestingLogger implements Contract {
     return new VestingLogger(address);
   }
 
-  static createFromConfig(config: VestingLoggerConfig, code: Cell, workchain = 0) {
+  static createFromConfig(
+    config: VestingLoggerConfig,
+    code: Cell,
+    workchain = 0
+  ) {
     const data = vestingLoggerConfigToCell(config);
     const init = { code, data };
     return new VestingLogger(contractAddress(workchain, init), init);
@@ -61,39 +55,124 @@ export class VestingLogger implements Contract {
     });
   }
 
+  // Register a new wallet
+  async sendRegisterWallet(
+    provider: ContractProvider,
+    via: Sender,
+    opts: {
+      value: bigint;
+      queryId?: bigint;
+      walletAddress: Address;
+      tokenAddress: Address;
+      walletOwnerAddress: Address;
+      receiverAddress: Address;
+      isAutoClaim: number;
+    }
+  ) {
+    await provider.internal(via, {
+      value: opts.value,
+      sendMode: SendMode.PAY_GAS_SEPARATELY,
+      body: beginCell()
+        .storeUint(VestingLoggerOpcodes.register_wallet, 32)
+        .storeUint(opts.queryId || 0, 64)
+        .storeAddress(opts.walletAddress)
+        .storeAddress(opts.tokenAddress)
+        .storeAddress(opts.walletOwnerAddress)
+        .storeAddress(opts.receiverAddress)
+        .storeUint(opts.isAutoClaim, 32)
+        .endCell(),
+    });
+  }
+
+  // Update recipient for an existing wallet
+  async sendUpdateRecipient(
+    provider: ContractProvider,
+    via: Sender,
+    opts: {
+      value: bigint;
+      queryId?: bigint;
+      walletAddress: Address;
+      oldReceiverAddress: Address;
+      newReceiverAddress: Address;
+    }
+  ) {
+    await provider.internal(via, {
+      value: opts.value,
+      sendMode: SendMode.PAY_GAS_SEPARATELY,
+      body: beginCell()
+        .storeUint(VestingLoggerOpcodes.update_recipient, 32)
+        .storeUint(opts.queryId || 0, 64)
+        .storeAddress(opts.walletAddress)
+        .storeAddress(opts.oldReceiverAddress)
+        .storeAddress(opts.newReceiverAddress)
+        .endCell(),
+    });
+  }
+
   // Get all wallets for a token
   async getTokenWallets(provider: ContractProvider, tokenAddress: Address) {
-    const result = await provider.get("get_token_wallets", [
-      { type: "slice", cell: beginCell().storeAddress(tokenAddress).endCell() },
-    ]);
-    return result.stack.readCell();
+    try {
+      const result = await provider.get("get_token_wallets", [
+        { type: "slice", cell: beginCell().storeAddress(tokenAddress).endCell() },
+      ]);
+      return result.stack.readCell();
+    } catch (error) {
+      console.error("Error in getTokenWallets:", error);
+      return beginCell().endCell(); // Return empty cell on error
+    }
   }
 
   // Get all wallets for an owner
   async getOwnerWallets(provider: ContractProvider, ownerAddress: Address) {
-    const result = await provider.get("get_owner_wallets", [
-      { type: "slice", cell: beginCell().storeAddress(ownerAddress).endCell() },
-    ]);
-    return result.stack.readCell();
+    try {
+      const result = await provider.get("get_owner_wallets", [
+        { type: "slice", cell: beginCell().storeAddress(ownerAddress).endCell() },
+      ]);
+      return result.stack.readCell();
+    } catch (error) {
+      console.error("Error in getOwnerWallets:", error);
+      return beginCell().endCell(); // Return empty cell on error
+    }
   }
 
   // Get all wallets for a receiver
-  async getReceiverWallets(provider: ContractProvider, receiverAddress: Address) {
-    const result = await provider.get("get_receiver_wallets", [
-      { type: "slice", cell: beginCell().storeAddress(receiverAddress).endCell() },
-    ]);
-    return result.stack.readCell();
+  async getReceiverWallets(
+    provider: ContractProvider,
+    receiverAddress: Address
+  ) {
+    try {
+      const result = await provider.get("get_receiver_wallets", [
+        {
+          type: "slice",
+          cell: beginCell().storeAddress(receiverAddress).endCell(),
+        },
+      ]);
+      return result.stack.readCell();
+    } catch (error) {
+      console.error("Error in getReceiverWallets:", error);
+      return beginCell().endCell(); // Return empty cell on error
+    }
   }
 
   // Get all wallets with auto claim enabled
   async getAutoClaimWallets(provider: ContractProvider) {
-    const result = await provider.get("get_auto_claim_wallets", []);
-    return result.stack.readCell();
+    try {
+      const result = await provider.get("get_auto_claim_wallets", []);
+      return result.stack.readCell();
+    } catch (error) {
+      console.error("Error in getAutoClaimWallets:", error);
+      return beginCell().endCell(); // Return empty cell on error
+    }
   }
 
   // Get logger owner
   async getOwner(provider: ContractProvider) {
-    const result = await provider.get("get_owner", []);
-    return result.stack.readAddress();
+    try {
+      const result = await provider.get("get_owner", []);
+      return result.stack.readAddress();
+    } catch (error) {
+      console.error("Error in getOwner:", error);
+      throw error; // Re-throw since we can't return a default address
+    }
   }
 }

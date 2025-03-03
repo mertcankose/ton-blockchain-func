@@ -1,14 +1,11 @@
-// scripts/custom-create-vesting.ts
 import { Address, toNano, fromNano } from "@ton/core";
 import { VestingMaster } from "../wrappers/VestingMaster";
 import { NetworkProvider } from "@ton/blueprint";
 
-const MASTER_CONTRACT_ADDRESS = "EQAOLJnZaOfOwnsYj18bujPzbsTdWgQdF-FTXkUKT-N-5uci";
+const MASTER_CONTRACT_ADDRESS = "EQB4q0etlQxavmRf1ZvOdD52PsvoACxygFhPZaxH9_xMgXar";
 
-const JETTON_MASTER_ADDRESS =
-  "kQBQCVW3qnGKeBcumkLVD6x_K2nehE6xC5VsCyJZ02wvUBJy"; // ⚠️ Buraya kullanmak istediğiniz jetton master adresini yazın
+const JETTON_MASTER_ADDRESS = "kQBQCVW3qnGKeBcumkLVD6x_K2nehE6xC5VsCyJZ02wvUBJy";
 
-// Özel vesting parametreleri (tümü saniye cinsinden)
 const CUSTOM_PARAMS = {
   START_DELAY: 60, // 1 minute
   TOTAL_DURATION: 3600, // 1 hour
@@ -16,12 +13,10 @@ const CUSTOM_PARAMS = {
   CLIFF_DURATION: 0, // 0
 };
 
-// Tarih formatı
 function formatDate(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleString();
 }
 
-// Süre formatı
 function formatDuration(seconds: number): string {
   const days = Math.floor(seconds / 86400);
   return days > 0 ? `${days} days` : `${seconds} seconds`;
@@ -49,22 +44,29 @@ export async function run(provider: NetworkProvider) {
     const totalDuration = CUSTOM_PARAMS.TOTAL_DURATION;
     const unlockPeriod = CUSTOM_PARAMS.UNLOCK_PERIOD;
     const cliffDuration = CUSTOM_PARAMS.CLIFF_DURATION;
+    const isAutoClaim = 1; // 0 = no auto claim, 1 = auto claim
+    const cancelContractPermission = 2; // 1 = only_recipient, 2 = only_owner, 3 = both, 4 = neither
+    const changeRecipientPermission = 2; // 1 = only_recipient, 2 = only_owner, 3 = both, 4 = neither
 
-    // Oluşturulacak wallet adresini al
     const walletAddress = await vestingMaster.getWalletAddress(
       provider.sender().address!,
+      provider.sender().address!, // Add recipient parameter (same as owner in this case)
       jettonMaster,
       vestingTotalAmount,
       startTime,
       totalDuration,
       unlockPeriod,
-      cliffDuration
+      cliffDuration,
+      isAutoClaim,
+      cancelContractPermission,
+      changeRecipientPermission
     );
 
     console.log(
       "\nVesting Wallet will be created with these CUSTOM parameters:"
     );
     console.log("- Owner:", provider.sender().address!.toString());
+    console.log("- Recipient:", provider.sender().address!.toString()); // Added recipient
     console.log("- Jetton Master:", jettonMaster.toString());
     console.log("- Vesting Total Amount:", fromNano(vestingTotalAmount), "tokens");
     console.log("- Start Time:", formatDate(startTime));
@@ -72,31 +74,32 @@ export async function run(provider: NetworkProvider) {
     console.log("- Unlock Period:", formatDuration(unlockPeriod));
     console.log("- Cliff Duration:", formatDuration(cliffDuration));
     console.log("- Wallet Address:", walletAddress.toString());
+    console.log("- Auto Claim:", isAutoClaim);
+    console.log("- Cancel Contract Permission:", cancelContractPermission);
+    console.log("- Change Recipient Permission:", changeRecipientPermission);
 
-    // Kullanıcı onayı - royalty fee göster
     console.log(
       `\nThis operation will cost ${fromNano(royaltyFee)} TON as royalty fee.`
     );
     console.log("Sending transaction...");
-
-    // Create vesting wallet mesajı gönder
+    
     const result = await vestingMaster.sendCreateVestingWallet(
       provider.sender(),
       {
-        value: royaltyFee + toNano("0.05"), // Royalty + gas
-        queryId: 0n,
+        value: royaltyFee + toNano("0.5"), // Royalty + gas
+        queryId: 1n,
         owner: provider.sender().address!,
-        recipient: provider.sender().address!,
+        recipient: provider.sender().address!, // Make sure this is set correctly
         jettonMaster: jettonMaster,
         vestingTotalAmount: vestingTotalAmount,
         startTime: startTime,
         totalDuration: totalDuration,
         unlockPeriod: unlockPeriod,
         cliffDuration: cliffDuration,
-        isAutoClaim: 1, // 0 = no auto claim, 1 = auto claim
-        cancelContractPermission: 1, // 1 = only_recipient, 2 = only_owner, 3 = both, 4 = neither
-        changeRecipientPermission: 1, // 1 = only_recipient, 2 = only_owner, 3 = both, 4 = neither
-        forwardRemainingBalance: toNano("0.05"), // Forward remaining balance to the vesting wallet
+        isAutoClaim: isAutoClaim,
+        cancelContractPermission: cancelContractPermission,
+        changeRecipientPermission: changeRecipientPermission,
+        forwardRemainingBalance: toNano("0.5"), // Forward remaining balance to the vesting wallet
       }
     );
 
@@ -109,6 +112,12 @@ export async function run(provider: NetworkProvider) {
       `   npx blueprint run wallet-info (after updating WALLET_ADDRESS to your new address)`
     );
 
+    return {
+      success: true,
+      address: walletAddress.toString(),
+    };
+    
+    
     return {
       success: true,
       address: walletAddress.toString(),

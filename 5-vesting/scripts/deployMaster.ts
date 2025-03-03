@@ -1,27 +1,29 @@
 // scripts/deploy-master.ts
-import { toNano, fromNano } from '@ton/core';
+import { toNano, fromNano, Address } from '@ton/core';
 import { VestingMaster } from '../wrappers/VestingMaster';
 import { compile, NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
   try {
-    // Önce wallet kodunu derle
+
+    const loggerAddress = Address.parse("EQBv3ZyJGTOflNI318e8vJxhuaviIUx6VenKXs2YNeCK93U8");
+
     console.log('Compiling Vesting Wallet code...');
     const walletCode = await compile('VestingWallet');
     
-    // Sonra master kontratını oluştur
     console.log('Creating Vesting Master contract...');
     const vestingMaster = provider.open(
       VestingMaster.createFromConfig({
         owner_address: provider.sender().address!,
         vesting_wallet_code: walletCode,
+        logger_address: loggerAddress,
         total_wallets_created: 0,
         total_royalty_collected: 0n
       },
       await compile('VestingMaster'))
     );
     
-    const DEPLOY_AMOUNT = toNano('0.2');
+    const DEPLOY_AMOUNT = toNano('0.1');
 
     console.log('Deploying Vesting Master contract...');
     console.log('Contract address:', vestingMaster.address.toString());
