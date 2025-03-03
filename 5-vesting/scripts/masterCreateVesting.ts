@@ -2,8 +2,7 @@ import { Address, toNano, fromNano } from "@ton/core";
 import { VestingMaster } from "../wrappers/VestingMaster";
 import { NetworkProvider } from "@ton/blueprint";
 
-const MASTER_CONTRACT_ADDRESS = "EQB4q0etlQxavmRf1ZvOdD52PsvoACxygFhPZaxH9_xMgXar";
-
+const MASTER_CONTRACT_ADDRESS = "EQBV7BsIY-U4ywfkn7jLSbi_UIjkGR6UZQJY38T0N4U-GKB2";
 const JETTON_MASTER_ADDRESS = "kQBQCVW3qnGKeBcumkLVD6x_K2nehE6xC5VsCyJZ02wvUBJy";
 
 const CUSTOM_PARAMS = {
@@ -86,7 +85,7 @@ export async function run(provider: NetworkProvider) {
     const result = await vestingMaster.sendCreateVestingWallet(
       provider.sender(),
       {
-        value: royaltyFee + toNano("0.5"), // Royalty + gas
+        value: royaltyFee + toNano("0.1"), // Royalty + gas
         queryId: 1n,
         owner: provider.sender().address!,
         recipient: provider.sender().address!, // Make sure this is set correctly
@@ -99,7 +98,7 @@ export async function run(provider: NetworkProvider) {
         isAutoClaim: isAutoClaim,
         cancelContractPermission: cancelContractPermission,
         changeRecipientPermission: changeRecipientPermission,
-        forwardRemainingBalance: toNano("0.5"), // Forward remaining balance to the vesting wallet
+        forwardRemainingBalance: toNano("0.1"), // Forward remaining balance to the vesting wallet
       }
     );
 

@@ -238,6 +238,12 @@ export class VestingMaster implements Contract {
     };
   }
 
+  // Get logger address
+  async getLoggerAddress(provider: ContractProvider) {
+    const result = await provider.get("get_logger_address", []);
+    return result.stack.readAddress();
+  }
+
   async getWalletAddress(
     provider: ContractProvider,
     owner: Address,

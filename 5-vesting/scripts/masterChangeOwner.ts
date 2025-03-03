@@ -31,8 +31,6 @@ export async function run(provider: NetworkProvider) {
     );
     
     console.log('Owner change transaction sent successfully!');
-    // @ts-ignore
-    console.log('Transaction ID:', result.transactions[0].id);
     console.log('\nImportant: After this operation, only the new owner will be able to:');
     console.log('- Update wallet code');
     console.log('- Change ownership again');
@@ -40,8 +38,6 @@ export async function run(provider: NetworkProvider) {
     
     return {
       success: true,
-      // @ts-ignore
-      txid: result.transactions[0].id,
       newOwner: newOwner.toString()
     };
   } catch (error) {
