@@ -6,7 +6,6 @@ const int op::transfer_notification = 0x7362d09c;
 const int op::excesses = 0xd53276db;
 
 ;; Vesting Wallet Operations
-const int op::add_whitelist = 0x1234;
 const int op::send_jettons = 0x7777;
 const int op::report_status = 0x7FEE;
 const int op::claim_unlocked = 0x8888;
@@ -65,7 +64,7 @@ int equal_slices(slice a, slice b) {
 ;; storage#_ owner_address:MsgAddress recipient_address:MsgAddress jetton_master_address:MsgAddress
 ;;            vesting_total_amount:Coins
 ;;            packed_params:uint128 is_auto_claim:uint1 cancel_contract_permission:uint3 change_recipient_permission:uint3
-;;            claimed_amount:Coins whitelist:(HashmapE 267 True) = Storage;
+;;            claimed_amount:Coins = Storage;
 
 ;; Unpack vesting parameters from packed format
 (int, int, int, int) unpack_vesting_params(int packed_params) inline {
@@ -76,10 +75,10 @@ int equal_slices(slice a, slice b) {
     return (vesting_start_time, vesting_total_duration, unlock_period, cliff_duration);
 }
 
-(slice, slice, slice, int, int, int, int, int, int, int, int, int, int, cell) load_data() inline {
+(slice, slice, slice, int, int, int, int, int, int, int, int, int, int) load_data() inline {
     var ds = get_data().begin_parse();
     if (ds.slice_empty?()) {
-        return (null(), null(), null(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, new_dict());
+        return (null(), null(), null(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
     slice owner_address = ds~load_msg_addr();
@@ -92,12 +91,6 @@ int equal_slices(slice a, slice b) {
     int change_recipient_permission = ds~load_uint(32);
     int claimed_amount = ds~load_coins();
     int seqno = ds~load_uint(32);
-
-    ;; Load whitelist
-    cell whitelist = new_dict();
-    if (ds.slice_refs() > 0) {
-        whitelist = ds~load_dict();
-    }
     
     ;; Unpack vesting parameters
     (int vesting_start_time, int vesting_total_duration, int unlock_period, int cliff_duration) = unpack_vesting_params(packed_params);
@@ -115,8 +108,7 @@ int equal_slices(slice a, slice b) {
         cancel_contract_permission,
         change_recipient_permission,
         claimed_amount,
-        seqno,
-        whitelist
+        seqno
     );
 }
 
@@ -125,7 +117,7 @@ int equal_slices(slice a, slice b) {
     int vesting_start_time, int vesting_total_duration, 
     int unlock_period, int cliff_duration, 
     int is_auto_claim, int cancel_contract_permission, int change_recipient_permission,
-    int claimed_amount, int seqno, cell whitelist) impure inline {
+    int claimed_amount, int seqno) impure inline {
     
     ;; Pack vesting parameters
     int packed_params = (vesting_start_time << 96) | 
@@ -146,7 +138,6 @@ int equal_slices(slice a, slice b) {
         .store_uint(change_recipient_permission, 32)
         .store_coins(claimed_amount)
         .store_uint(seqno, 32)
-        .store_dict(whitelist)
         .end_cell()
     );
 }
@@ -202,19 +193,6 @@ int calculate_locked_amount(int vesting_total_amount, int vesting_start_time, in
     return vesting_total_amount - unlocked;
 }
 
-;; Check if an address is in the whitelist
-int is_whitelisted(slice address, cell whitelist_dict) inline {
-    (int wc, int addr_hash) = parse_std_addr(address);
-    (slice value, int found) = whitelist_dict.udict_get?(ADDRESS_SIZE, addr_hash);
-    return found;
-}
-
-;; Add address to whitelist
-cell add_to_whitelist(cell whitelist, slice address) impure inline {
-    (int wc, int addr_hash) = parse_std_addr(address);
-    return whitelist.udict_set_builder(ADDRESS_SIZE, addr_hash, begin_cell().store_int(-1, 1));
-}
-
 () recv_external(slice in_msg) impure {
     ;; Parse message
     int msg_seqno = in_msg~load_uint(32);
@@ -224,7 +202,7 @@ cell add_to_whitelist(cell whitelist, slice address) impure inline {
     var (owner_address, recipient_address, jetton_master_address, vesting_total_amount, 
         vesting_start_time, vesting_total_duration, unlock_period, cliff_duration, 
         is_auto_claim, cancel_contract_permission, change_recipient_permission, 
-        claimed_amount, seqno, whitelist) = load_data();
+        claimed_amount, seqno) = load_data();
     
     ;; Check sequence number
     throw_unless(33, msg_seqno == seqno);
@@ -277,7 +255,7 @@ cell add_to_whitelist(cell whitelist, slice address) impure inline {
     save_data(owner_address, recipient_address, jetton_master_address, vesting_total_amount, 
         vesting_start_time, vesting_total_duration, unlock_period, cliff_duration,
         is_auto_claim, cancel_contract_permission, change_recipient_permission,
-        claimed_amount, seqno, whitelist);
+        claimed_amount, seqno);
 }
 
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
@@ -298,7 +276,7 @@ cell add_to_whitelist(cell whitelist, slice address) impure inline {
     var (owner_address, recipient_address, jetton_master_address, vesting_total_amount, 
         vesting_start_time, vesting_total_duration, unlock_period, cliff_duration, 
         is_auto_claim, cancel_contract_permission, change_recipient_permission, 
-        claimed_amount, seqno, whitelist) = load_data();
+        claimed_amount, seqno) = load_data();
   
     int op = in_msg_body~load_uint(32);
     int query_id = in_msg_body~load_uint(64);
@@ -341,7 +319,7 @@ cell add_to_whitelist(cell whitelist, slice address) impure inline {
         save_data(owner_address, recipient_address, jetton_master_address, claimed_amount,
             vesting_start_time, vesting_total_duration, unlock_period, cliff_duration, 
             is_auto_claim, cancel_contract_permission, change_recipient_permission, 
-            claimed_amount, seqno, whitelist);
+            claimed_amount, seqno);
         
         return ();
     }
@@ -359,23 +337,8 @@ cell add_to_whitelist(cell whitelist, slice address) impure inline {
         save_data(owner_address, new_recipient_address, jetton_master_address, vesting_total_amount,
             vesting_start_time, vesting_total_duration, unlock_period, cliff_duration, 
             is_auto_claim, cancel_contract_permission, change_recipient_permission, 
-            claimed_amount, seqno, whitelist);
+            claimed_amount, seqno);
         
-        return ();
-    }
-
-    ;; add to whitelist
-    if (op == op::add_whitelist) {
-        ;; Check if sender is owner
-        throw_unless(error::access_denied, equal_slices(sender_addr, owner_address));
-    
-        slice new_addr = in_msg_body~load_msg_addr();
-        whitelist = add_to_whitelist(whitelist, new_addr);
-    
-        save_data(owner_address, recipient_address, jetton_master_address, vesting_total_amount, 
-            vesting_start_time, vesting_total_duration, unlock_period, cliff_duration,
-            is_auto_claim, cancel_contract_permission, change_recipient_permission, 
-            claimed_amount, seqno, whitelist);
         return ();
     }
 
@@ -420,7 +383,7 @@ cell add_to_whitelist(cell whitelist, slice address) impure inline {
         save_data(owner_address, recipient_address, jetton_master_address, vesting_total_amount, 
             vesting_start_time, vesting_total_duration, unlock_period, cliff_duration,
             is_auto_claim, cancel_contract_permission, change_recipient_permission,
-            claimed_amount, seqno, whitelist);
+            claimed_amount, seqno);
         return ();
     }
 
@@ -434,8 +397,7 @@ cell add_to_whitelist(cell whitelist, slice address) impure inline {
         int forward_ton_amount = in_msg_body~load_coins();
         slice jetton_wallet_address = in_msg_body~load_msg_addr();
 
-        ;; Check if recipient is owner or whitelisted
-        throw_unless(error::access_denied, equal_slices(to_addr, owner_address) | is_whitelisted(to_addr, whitelist));
+        throw_unless(error::access_denied, equal_slices(to_addr, owner_address));
     
         ;; Create jetton transfer message
         var msg = begin_cell()
@@ -469,56 +431,56 @@ cell add_to_whitelist(cell whitelist, slice address) impure inline {
 }
 
 ;; Get vesting parameters
-(slice, slice, slice, int, int, int, int, int, int, int, int, int, int, cell) get_vesting_data() method_id {
+(slice, slice, slice, int, int, int, int, int, int, int, int, int, int) get_vesting_data() method_id {
     return load_data();
 }
 
 ;; Get owner address
 slice get_owner() method_id {
-    var (owner_address, _, _, _, _, _, _, _, _, _, _, _, _, _) = load_data();
+    var (owner_address, _, _, _, _, _, _, _, _, _, _, _, _) = load_data();
     return owner_address;
 }
 
 ;; Get recipient address
 slice get_recipient() method_id {
-    var (_, recipient_address, _, _, _, _, _, _, _, _, _, _, _, _) = load_data();
+    var (_, recipient_address, _, _, _, _, _, _, _, _, _, _, _) = load_data();
     return recipient_address;
 }
 
 ;; Get cancel permission
 int get_cancel_contract_permission() method_id {
-    var (_, _, _, _, _, _, _, _, _, cancel_contract_permission, _, _, _, _) = load_data();
+    var (_, _, _, _, _, _, _, _, _, cancel_contract_permission, _, _, _) = load_data();
     return cancel_contract_permission;
 }
 
 ;; Get change recipient permission
 int get_change_recipient_permission() method_id {
-    var (_, _, _, _, _, _, _, _, _, _, change_recipient_permission, _, _, _) = load_data();
+    var (_, _, _, _, _, _, _, _, _, _, change_recipient_permission, _, _) = load_data();
     return change_recipient_permission;
 }
 
 ;; Get auto claim flag
 int get_is_auto_claim() method_id {
-    var (_, _, _, _, _, _, _, _, is_auto_claim, _, _, _, _, _) = load_data();
+    var (_, _, _, _, _, _, _, _, is_auto_claim, _, _, _, _) = load_data();
     return is_auto_claim;
 }
 
 ;; Check if a specific address can cancel the contract
 int can_cancel_contract(slice address) method_id {
-    var (owner_address, recipient_address, _, _, _, _, _, _, _, cancel_contract_permission, _, _, _, _) = load_data();
+    var (owner_address, recipient_address, _, _, _, _, _, _, _, cancel_contract_permission, _, _, _) = load_data();
     return check_permission(address, owner_address, recipient_address, cancel_contract_permission);
 }
 
 ;; Check if a specific address can change the recipient
 int can_change_recipient(slice address) method_id {
-    var (owner_address, recipient_address, _, _, _, _, _, _, _, _, change_recipient_permission, _, _, _) = load_data();
+    var (owner_address, recipient_address, _, _, _, _, _, _, _, _, change_recipient_permission, _, _) = load_data();
     return check_permission(address, owner_address, recipient_address, change_recipient_permission);
 }
 
 ;; Get locked amount at a specific time
 int get_locked_amount(int at_time) method_id {
     var (_, _, _, vesting_total_amount, vesting_start_time, vesting_total_duration, 
-        unlock_period, cliff_duration, _, _, _, _, _, _) = load_data();
+        unlock_period, cliff_duration, _, _, _, _, _) = load_data();
   
     return calculate_locked_amount(vesting_total_amount, vesting_start_time, 
         vesting_total_duration, unlock_period, cliff_duration, at_time);
@@ -527,7 +489,7 @@ int get_locked_amount(int at_time) method_id {
 ;; Get unlocked amount at a specific time
 int get_unlocked_amount(int at_time) method_id {
     var (_, _, _, vesting_total_amount, vesting_start_time, vesting_total_duration, 
-        unlock_period, cliff_duration, _, _, _, _, _, _) = load_data();
+        unlock_period, cliff_duration, _, _, _, _, _) = load_data();
   
     return calculate_unlocked_amount(vesting_total_amount, vesting_start_time, 
         vesting_total_duration, unlock_period, cliff_duration, at_time);
@@ -545,14 +507,14 @@ int get_current_unlocked_amount() method_id {
 
 ;; Get claimed amount
 int get_claimed_amount() method_id {
-    var (_, _, _, _, _, _, _, _, _, _, _, claimed_amount, _, _) = load_data();
+    var (_, _, _, _, _, _, _, _, _, _, _, claimed_amount, _) = load_data();
     return claimed_amount;
 }
 
 ;; Get claimable amount
 int get_claimable_amount() method_id {
     var (_, _, _, vesting_total_amount, vesting_start_time, vesting_total_duration, 
-        unlock_period, cliff_duration, _, _, _, claimed_amount, _, _) = load_data();
+        unlock_period, cliff_duration, _, _, _, claimed_amount, _) = load_data();
     
     int unlocked_amount = calculate_unlocked_amount(vesting_total_amount, vesting_start_time, 
         vesting_total_duration, unlock_period, cliff_duration, now());
@@ -560,36 +522,13 @@ int get_claimable_amount() method_id {
     return unlocked_amount - claimed_amount;
 }
 
-;; Check if address is whitelisted
-int get_is_whitelisted(slice address) method_id {
-    var (_, _, _, _, _, _, _, _, _, _, _, _, _, whitelist) = load_data();
-    return is_whitelisted(address, whitelist);
-}
-
-;; Get whitelist as list of (wc, hash_part) tuples
-tuple get_whitelist() method_id {
-    var (_, _, _, _, _, _, _, _, _, _, _, _, _, whitelist) = load_data();
-    var list = null();
-    
-    cell d = whitelist;
-    do {
-        (d, slice key, slice value, int found) = d.dict_delete_get_min(ADDRESS_SIZE);
-        if (found) {
-            (int wc, int address_hash) = unpack_address(key);
-            list = cons(pair(wc, address_hash), list);
-        }
-    } until (~ found);
-    
-    return list;
-}
-
 ;; Get vesting total amount directly
 int get_vesting_total_amount() method_id {
-    var (_, _, _, vesting_total_amount, _, _, _, _, _, _, _, _, _, _) = load_data();
+    var (_, _, _, vesting_total_amount, _, _, _, _, _, _, _, _, _) = load_data();
     return vesting_total_amount;
 }
 
 int get_seqno() method_id {
-    var (_, _, _, _, _, _, _, _, _, _, _, _, seqno, _) = load_data();
+    var (_, _, _, _, _, _, _, _, _, _, _, _, seqno) = load_data();
     return seqno;
 }

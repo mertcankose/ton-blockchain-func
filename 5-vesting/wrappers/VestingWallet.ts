@@ -27,7 +27,6 @@ export const DEFAULT_JETTON_MASTER =
 export const VestingWalletOpcodes = {
   transfer_notification: 0x7362d09c,
   excesses: 0xd53276db,
-  add_whitelist: 0x1234,
   send_jettons: 0x7777,
   report_status: 0x7fee,
   claim_unlocked: 0x8888,
@@ -205,25 +204,6 @@ export class VestingWallet implements Contract {
     });
   }
 
-  // Add address to whitelist
-  async addWhitelist(
-    provider: ContractProvider,
-    via: Sender,
-    address: Address
-  ) {
-    const queryId = BigInt(Math.floor(Math.random() * 10000000000));
-
-    return await provider.internal(via, {
-      value: toNano("0.05"),
-      sendMode: SendMode.PAY_GAS_SEPARATELY,
-      body: beginCell()
-        .storeUint(VestingWalletOpcodes.add_whitelist, 32)
-        .storeUint(queryId, 64)
-        .storeAddress(address)
-        .endCell(),
-    });
-  }
-
   // cancelVesting
   async cancelVesting(provider: ContractProvider, via: Sender,
     opts: {
@@ -281,7 +261,6 @@ export class VestingWallet implements Contract {
       cancelContractPermission: result.stack.readNumber(),
       changeRecipientPermission: result.stack.readNumber(),
       claimedAmount: result.stack.readBigNumber(),
-      whitelist: result.stack.readCell(),
     };
   }
 
@@ -362,19 +341,6 @@ export class VestingWallet implements Contract {
     return result.stack.readBigNumber();
   }
 
-  // Check if address is whitelisted
-  async getIsWhitelisted(provider: ContractProvider, address: Address) {
-    const result = await provider.get("get_is_whitelisted", [
-      { type: "slice", cell: beginCell().storeAddress(address).endCell() },
-    ]);
-    return result.stack.readNumber();
-  }
-
-  // Get whitelist
-  async getWhitelist(provider: ContractProvider) {
-    const result = await provider.get("get_whitelist", []);
-    return result.stack.readTuple();
-  }
 
   async getVestingTotalAmount(provider: ContractProvider) {
     const result = await provider.get("get_vesting_total_amount", []);

@@ -86,10 +86,6 @@ cell create_vesting_wallet_state_init(slice owner_address, slice recipient_addre
     int vesting_total_amount, int vesting_params, int is_auto_claim, 
     int cancel_permission, int change_recipient_permission, cell wallet_code) inline {
 
-    cell whitelist = new_dict();
-    (int wc, int addr_hash) = parse_std_addr(owner_address);
-    whitelist = whitelist.udict_set_builder(ADDRESS_SIZE, addr_hash, begin_cell().store_int(-1, 1));
-
     cell data = begin_cell()
         .store_slice(owner_address) 
         .store_slice(recipient_address)
@@ -100,7 +96,6 @@ cell create_vesting_wallet_state_init(slice owner_address, slice recipient_addre
         .store_uint(cancel_permission, 3)
         .store_uint(change_recipient_permission, 3)
         .store_coins(0) ;; Initial claimed amount
-        .store_dict(whitelist) ;; Initial whitelist with owner included
         .end_cell();
     
     return begin_cell()
