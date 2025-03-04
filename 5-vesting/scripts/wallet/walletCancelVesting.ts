@@ -1,26 +1,27 @@
 import { Address, fromNano, toNano } from '@ton/core';
-import { VestingWallet } from '../wrappers/VestingWallet';
+import { VestingWallet } from '../../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 
-const WALLET_ADDRESS = "EQAgFFbyxbVkh_j3ERptIxfqiL92RdSGQJ0WNPrwodwHeaUk";
+const WALLET_ADDRESS = "EQB9HKUKa9iRzn6-NtmqbYYkJgxVangaQPDpWUtR3CTBbij-";
 
 export async function run(provider: NetworkProvider) {
   try {
     const walletAddress = Address.parse(WALLET_ADDRESS);
     const vestingWallet = provider.open(VestingWallet.createFromAddress(walletAddress));
     
-    let newRecipientAddress = Address.parse("0QARfBT9PMJ_TjX8bUqFvI-ZMqixM7kY68_-7tmVm-khfOyj");
+    let jettonWalletAddress = Address.parse("EQBdrXrlWC9d8OmySn41pi17kp0QoWTMJQl6YcT1DDuqDyZj");
     
     const forwardTonAmount = toNano('0.5');
-    const result = await vestingWallet.changeRecipient(
+    const result = await vestingWallet.cancelVesting(
       provider.provider(walletAddress),
       provider.sender(),
       {
-        newRecipientAddress: newRecipientAddress
+        forwardTonAmount,
+        jettonWalletAddress
       }
     );
     
-    console.log('Change recipient transaction sent successfully!');
+    console.log('Cancel transaction sent successfully!');
     
     return {
       success: true,

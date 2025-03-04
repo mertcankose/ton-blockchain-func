@@ -1,9 +1,10 @@
 // scripts/wallet-info.ts
 import { Address, fromNano } from '@ton/core';
-import { VestingWallet } from '../wrappers/VestingWallet';
+import { VestingWallet } from '../../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 
-const WALLET_ADDRESS = "EQAa6Mdx5CE2HwHh8SowgB1kGaD_vMTmDt9NjuXu3ZQE4kKr";
+const WALLET_ADDRESS = "EQB9HKUKa9iRzn6-NtmqbYYkJgxVangaQPDpWUtR3CTBbij-";
+
 
 // Tarih formatı
 function formatDate(timestamp: number): string {

@@ -1,9 +1,8 @@
 import { Address, toNano, fromNano } from '@ton/core';
-import { VestingWallet } from '../wrappers/VestingWallet';
+import { VestingWallet } from '../../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 
-const WALLET_ADDRESS = "EQAgFFbyxbVkh_j3ERptIxfqiL92RdSGQJ0WNPrwodwHeaUk";
-
+const WALLET_ADDRESS = "EQB9HKUKa9iRzn6-NtmqbYYkJgxVangaQPDpWUtR3CTBbij-";
 const RECIPIENT_ADDRESS = "0QARfBT9PMJ_TjX8bUqFvI-ZMqixM7kY68_-7tmVm-khfOyj";
 
 const TOKEN_AMOUNT = "50";

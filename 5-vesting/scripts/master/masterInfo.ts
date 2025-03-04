@@ -1,9 +1,10 @@
 // scripts/master-info.ts
 import { Address, fromNano } from '@ton/core';
-import { VestingMaster } from '../wrappers/VestingMaster';
+import { VestingMaster } from '../../wrappers/VestingMaster';
 import { NetworkProvider } from '@ton/blueprint';
 
-const MASTER_CONTRACT_ADDRESS = "EQD46xjiwKchK-Uwm4r2xuLKKbeHnXSGAwCTob9jS2Z3C0j-";
+const MASTER_CONTRACT_ADDRESS = "EQDuKU3ALvqSInYb5B4TwYTro2-5o2-P-P3UrXwGmD11IhrB";
+
 
 export async function run(provider: NetworkProvider) {
   try {

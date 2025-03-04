@@ -1,9 +1,8 @@
-// scripts/create-vesting.ts
 import { Address, toNano, fromNano } from "@ton/core";
-import { VestingMaster } from "../wrappers/VestingMaster";
+import { VestingMaster } from "../../wrappers/VestingMaster";
 import { NetworkProvider } from "@ton/blueprint";
 
-const MASTER_CONTRACT_ADDRESS = "EQD46xjiwKchK-Uwm4r2xuLKKbeHnXSGAwCTob9jS2Z3C0j-";
+const MASTER_CONTRACT_ADDRESS = "EQDuKU3ALvqSInYb5B4TwYTro2-5o2-P-P3UrXwGmD11IhrB";
 const JETTON_MASTER_ADDRESS = "kQBQCVW3qnGKeBcumkLVD6x_K2nehE6xC5VsCyJZ02wvUBJy";
 
 const CUSTOM_PARAMS = {
@@ -59,10 +58,7 @@ export async function run(provider: NetworkProvider) {
     const cancelContractPermission = 2; // 1 = only_recipient, 2 = only_owner, 3 = both, 4 = neither
     const changeRecipientPermission = 2; // 1 = only_recipient, 2 = only_owner, 3 = both, 4 = neither
 
-    // Aynı adresi hem owner hem recipient olarak kullanmak yerine,
-    // bu örnekte owner ve recipient farklı olsun
     const ownerAddress = provider.sender().address!;
-    // Recipient adresini değiştirmek istiyorsanız burayı düzenleyin
     const recipientAddress = provider.sender().address!;
 
     const walletAddress = await vestingMaster.getWalletAddress(
@@ -103,7 +99,7 @@ export async function run(provider: NetworkProvider) {
     const result = await vestingMaster.sendCreateVestingWallet(
       provider.sender(),
       {
-        value: royaltyFee + toNano("1"), // Royalty + gas
+        value: royaltyFee + toNano("0.1"), // Royalty + gas
         queryId: 1n,
         owner: ownerAddress,
         recipient: recipientAddress,
@@ -116,7 +112,7 @@ export async function run(provider: NetworkProvider) {
         isAutoClaim: isAutoClaim,
         cancelContractPermission: cancelContractPermission,
         changeRecipientPermission: changeRecipientPermission,
-        forwardRemainingBalance: toNano("1"), // Forward remaining balance to the vesting wallet
+        forwardRemainingBalance: toNano("0.1"), // Forward remaining balance to the vesting wallet
       }
     );
 

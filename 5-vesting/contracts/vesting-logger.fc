@@ -6,9 +6,11 @@ const int op::register_wallet = 0xd1d1d1d1;
 const int op::update_recipient = 0xd2d2d2d2;
 const int op::log_claim = 0xd3d3d3d3;
 const int op::log_cancel = 0xd4d4d4d4;
+const int op::set_logger_address = 0x4567;
 
 ;; Error codes
 const int error::access_denied = 0x1001;
+const int error::invalid_data = 0x1002;
 
 ;; Define global variables for storage
 global slice storage::owner;
@@ -131,20 +133,58 @@ cell add_to_index(cell index_dict, slice key_address, slice wallet_address) inli
     ;; Load data into global variables
     load_data();
     
-    if (storage::owner.preload_uint(2) == 0) {
-        storage::owner = sender_addr;
-        storage::init? = true;
-    }
-    
-    throw_unless(error::access_denied, equal_slices(sender_addr, storage::owner));
-    
+    ;; Handle registration from vesting master contract
     if (op == op::register_wallet) {
-        ;; Register a new vesting wallet
-        slice wallet_address = in_msg_body~load_msg_addr();
-        slice token_address = in_msg_body~load_msg_addr();
-        slice wallet_owner_address = in_msg_body~load_msg_addr();
-        slice receiver_address = in_msg_body~load_msg_addr();
-        int is_auto_claim = in_msg_body~load_uint(32);
+        ;; If contract is not initialized, accept initial message and set sender as owner
+        if (~ storage::init?) {
+            storage::owner = sender_addr;
+            storage::init? = true;
+            save_data();
+        }
+        
+        ;; Modified to handle both direct message format and reference format
+        slice wallet_address = null();
+        slice token_address = null();
+        slice wallet_owner_address = null();
+        slice receiver_address = null();
+        int is_auto_claim = 0;
+        
+        if (in_msg_body.slice_refs() >= 2) {
+            cell log_data = in_msg_body~load_ref();
+            slice log_data_cs = log_data.begin_parse();
+            
+            wallet_address = log_data_cs~load_msg_addr();
+            token_address = log_data_cs~load_msg_addr();
+            
+            cell log_data2 = in_msg_body~load_ref();
+            slice log_data2_cs = log_data2.begin_parse();
+            
+            wallet_owner_address = log_data2_cs~load_msg_addr();
+            receiver_address = log_data2_cs~load_msg_addr();
+            
+            ;; Check if we have auto_claim data
+            if (log_data2_cs.slice_bits() >= 32) {
+                is_auto_claim = log_data2_cs~load_uint(32);
+            } elseif (log_data2_cs.slice_bits() >= 1) {
+                ;; Also check if it might be a 1-bit value
+                is_auto_claim = log_data2_cs~load_uint(1);
+            } else {
+                is_auto_claim = 0; ;; Default value
+            }
+        } else {
+            ;; Traditional format (all data in main message body)
+            wallet_address = in_msg_body~load_msg_addr();
+            token_address = in_msg_body~load_msg_addr();
+            wallet_owner_address = in_msg_body~load_msg_addr();
+            receiver_address = in_msg_body~load_msg_addr();
+            is_auto_claim = in_msg_body~load_uint(32);
+        }
+        
+        ;; Validate that we have all required addresses
+        throw_unless(error::invalid_data, ~ null?(wallet_address));
+        throw_unless(error::invalid_data, ~ null?(token_address));
+        throw_unless(error::invalid_data, ~ null?(wallet_owner_address));
+        throw_unless(error::invalid_data, ~ null?(receiver_address));
         
         ;; Update token -> wallets mapping
         storage::token_wallets = add_to_index(storage::token_wallets, token_address, wallet_address);
@@ -156,7 +196,8 @@ cell add_to_index(cell index_dict, slice key_address, slice wallet_address) inli
         storage::receiver_wallets = add_to_index(storage::receiver_wallets, receiver_address, wallet_address);
         
         ;; Update auto claim list if needed
-        if (is_auto_claim) {
+        ;; Convert any non-zero value to 1 for consistency
+        if (is_auto_claim != 0) {
             (int wallet_wc, int wallet_hash) = parse_std_addr(wallet_address);
             storage::auto_claim_wallets~udict_set_builder(267, wallet_hash, begin_cell().store_int(-1, 1));
         }
@@ -165,6 +206,26 @@ cell add_to_index(cell index_dict, slice key_address, slice wallet_address) inli
         save_data();
         return ();
     }
+    
+    ;; For all other operations, enforce owner-only access
+    if (~ storage::init?) {
+        storage::owner = sender_addr;
+        storage::init? = true;
+    }
+    
+    ;; Owner-only operations
+    if (op == op::set_logger_address) {
+        ;; Allow setting owner
+        if (equal_slices(sender_addr, storage::owner)) {
+            slice new_owner = in_msg_body~load_msg_addr();
+            storage::owner = new_owner;
+            save_data();
+        }
+        return ();
+    }
+    
+    ;; Check owner access for remaining operations
+    throw_unless(error::access_denied, equal_slices(sender_addr, storage::owner));
     
     if (op == op::update_recipient) {
         ;; Update recipient for an existing wallet
@@ -285,6 +346,12 @@ cell get_auto_claim_wallets() method_id {
 
 ;; Get logger owner
 slice get_owner() method_id {
+    load_data();
+    return storage::owner;
+}
+
+;; Get logger owner
+slice get_owner2() method_id {
     load_data();
     return storage::owner;
 }

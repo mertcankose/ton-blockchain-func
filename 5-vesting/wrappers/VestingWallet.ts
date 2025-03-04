@@ -284,7 +284,7 @@ export class VestingWallet implements Contract {
     const queryId = BigInt(Math.floor(Math.random() * 10000000000))
 
     return await provider.internal(via, {
-      value: toNano("0.05"),
+      value: toNano("0.5"),
       sendMode: SendMode.PAY_GAS_SEPARATELY,
       body: beginCell()
         .storeUint(VestingWalletOpcodes.cancel_vesting, 32)

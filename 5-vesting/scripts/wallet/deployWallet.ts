@@ -1,6 +1,6 @@
 // scripts/deploy-wallet.ts
 import { toNano, Address, fromNano } from '@ton/core';
-import { VestingWallet } from '../wrappers/VestingWallet';
+import { VestingWallet } from '../../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 import { compile } from '@ton/blueprint';
 

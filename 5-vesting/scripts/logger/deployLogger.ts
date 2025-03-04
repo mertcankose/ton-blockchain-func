@@ -1,14 +1,11 @@
-// scripts/deploy-master.ts
 import { toNano, fromNano, Address } from "@ton/core";
 import { compile, NetworkProvider } from "@ton/blueprint";
-import { VestingLogger } from "../wrappers/VestingLogger";
+import { VestingLogger } from "../../wrappers/VestingLogger";
 
 export async function run(provider: NetworkProvider) {
   try {
     console.log("Compiling Vesting Logger code...");
-    const loggerCode = await compile("VestingLogger");
-
-    console.log("Creating Vesting Logger contract...");
+    
     const vestingLogger = provider.open(
       VestingLogger.createFromConfig(
         {

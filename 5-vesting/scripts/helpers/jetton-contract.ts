@@ -7,7 +7,7 @@ export async function run(provider: NetworkProvider) {
     const client = new TonClient({ endpoint: 'https://testnet.toncenter.com/api/v2/jsonRPC', apiKey: API_KEY });
 
     try {
-        const userAddressCell = beginCell().storeAddress(Address.parse("EQAgFFbyxbVkh_j3ERptIxfqiL92RdSGQJ0WNPrwodwHeaUk")).endCell();
+        const userAddressCell = beginCell().storeAddress(Address.parse("EQB9HKUKa9iRzn6-NtmqbYYkJgxVangaQPDpWUtR3CTBbij-")).endCell();
 
         const response = await client.runMethod(Address.parse(jettonMasterAddress), 'get_wallet_address', [
             { type: 'slice', cell: userAddressCell },

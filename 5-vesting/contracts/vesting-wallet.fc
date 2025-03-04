@@ -84,18 +84,15 @@ int equal_slices(slice a, slice b) {
         return (null(), null(), null(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
-    ;; Load from cell 1 - owner address
     cell cell1 = ds~load_ref();
     slice data1 = cell1.begin_parse();
     slice owner_address = data1~load_msg_addr();
     
-    ;; Load from cell 2 - recipient and jetton master addresses
     cell cell2 = ds~load_ref();
     slice data2 = cell2.begin_parse();
     slice recipient_address = data2~load_msg_addr();
     slice jetton_master_address = data2~load_msg_addr();
     
-    ;; Load from cell 3 - vesting parameters
     cell cell3 = ds~load_ref();
     slice data3 = cell3.begin_parse();
     int vesting_total_amount = data3~load_coins();

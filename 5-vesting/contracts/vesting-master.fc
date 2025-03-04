@@ -225,18 +225,6 @@ cell create_vesting_wallet_state_init(slice owner_address, slice recipient_addre
         
         send_raw_message(msg.end_cell(), send_mode::pay_gas_separately);
         
-        ;; Send royalty fee to owner
-        var royalty_msg = begin_cell()
-            .store_uint(0x10, 6)
-            .store_slice(owner_address)
-            .store_coins(royalty::fee)
-            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-            .store_uint(op::collect_royalty, 32)
-            .store_uint(query_id, 64)
-            .store_uint(total_wallets_created + 1, 64);
-        
-        send_raw_message(royalty_msg.end_cell(), send_mode::pay_gas_separately);
-        
         ;; Send log message to logger
         if ((~ null?(logger_address)) & (logger_address.preload_uint(2) != 0)) {
             var log_msg = begin_cell()
@@ -257,7 +245,7 @@ cell create_vesting_wallet_state_init(slice owner_address, slice recipient_addre
             cell log_data2 = begin_cell()
                 .store_slice(vesting_owner)
                 .store_slice(vesting_recipient)
-                .store_uint(is_auto_claim, 32)
+                .store_uint(is_auto_claim, 1)
                 .end_cell();
                 
             log_msg = log_msg.store_ref(log_data).store_ref(log_data2);
@@ -265,7 +253,6 @@ cell create_vesting_wallet_state_init(slice owner_address, slice recipient_addre
             send_raw_message(log_msg.end_cell(), send_mode::pay_gas_separately);
         }
 
-        ;; Update state with new royalty collected and wallets created
         save_data(
             owner_address, 
             vesting_wallet_code,
@@ -273,18 +260,6 @@ cell create_vesting_wallet_state_init(slice owner_address, slice recipient_addre
             total_wallets_created + 1, 
             total_royalty_collected + royalty::fee
         );
-        
-        ;; Send wallet address back to sender
-        var addr_msg = begin_cell()
-            .store_uint(0x18, 6)
-            .store_slice(sender_addr)
-            .store_coins(10000000) ;; Minimal amount
-            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-            .store_uint(op::take_wallet_address, 32)
-            .store_uint(query_id, 64)
-            .store_slice(vesting_wallet_address);
-        
-        send_raw_message(addr_msg.end_cell(), send_mode::pay_gas_separately);
         
         return ();
     }
@@ -365,39 +340,39 @@ cell create_vesting_wallet_state_init(slice owner_address, slice recipient_addre
         send_raw_message(msg.end_cell(), send_mode::pay_gas_separately);
         return ();
     }
-    
-    ;; Handle owner-specific operations
-    if (equal_slices(sender_addr, owner_address)) {
-        ;; Update vesting wallet code (owner only)
-        if (op == op::update_vesting_wallet_code) {
-            cell new_code = in_msg_body~load_ref();
-            save_data(owner_address, new_code, logger_address, total_wallets_created, total_royalty_collected);
-            return ();
-        }
-        
-        ;; Change owner (owner only)
-        if (op == op::change_owner) { ;; change_owner op
-            slice new_owner = in_msg_body~load_msg_addr();
-            save_data(new_owner, vesting_wallet_code, logger_address, total_wallets_created, total_royalty_collected);
-            return ();
-        }
-        
-        ;; Withdraw excess TON (owner only)
-        if (op == op::withdraw_tons) { ;; withdraw_tons op
-            int withdraw_amount = in_msg_body~load_coins();
-            var [balance, _] = get_balance();
-            throw_unless(error::insufficient_balance, balance >= withdraw_amount);
-            int return_value = min(withdraw_amount, balance - min_tons_for_storage);
 
-            var msg = begin_cell()
+    ;; Update vesting wallet code (owner only)
+    if (op == op::update_vesting_wallet_code) {
+        throw_unless(error::access_denied, equal_slices(sender_addr, owner_address));
+        cell new_code = in_msg_body~load_ref();
+        save_data(owner_address, new_code, logger_address, total_wallets_created, total_royalty_collected);
+        return ();
+    }
+
+    ;; Change owner (owner only)
+    if (op == op::change_owner) {
+        throw_unless(error::access_denied, equal_slices(sender_addr, owner_address));
+        slice new_owner = in_msg_body~load_msg_addr();
+        save_data(new_owner, vesting_wallet_code, logger_address, total_wallets_created, total_royalty_collected);
+        return ();
+    }
+
+    ;; Withdraw excess TON (owner only)
+    if (op == op::withdraw_tons) {
+        throw_unless(error::access_denied, equal_slices(sender_addr, owner_address));
+        int withdraw_amount = in_msg_body~load_coins();
+        var [balance, _] = get_balance();
+        throw_unless(error::insufficient_balance, balance >= withdraw_amount);
+        int return_value = min(withdraw_amount, balance - min_tons_for_storage);
+
+        var msg = begin_cell()
                 .store_uint(0x10, 6)
                 .store_slice(owner_address)
                 .store_coins(return_value)
                 .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
                 
-            send_raw_message(msg.end_cell(), send_mode::pay_gas_separately);
-            return ();
-        }
+        send_raw_message(msg.end_cell(), send_mode::pay_gas_separately);
+        return ();
     }
     
     ;; Unknown operation

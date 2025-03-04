@@ -1,11 +1,12 @@
 import { toNano, fromNano, Address } from '@ton/core';
-import { VestingMaster } from '../wrappers/VestingMaster';
+import { VestingMaster } from '../../wrappers/VestingMaster';
 import { compile, NetworkProvider } from '@ton/blueprint';
+
+const LOGGER_CONTRACT_ADDRESS = "EQBaMz7htKmKL9G9ZFBvDJpCNHz_klwYQYCoxf1WJ-26vRJJ";
 
 export async function run(provider: NetworkProvider) {
   try {
     // Logger adresi (varsa)
-    const loggerAddress = Address.parse("EQBv3ZyJGTOflNI318e8vJxhuaviIUx6VenKXs2YNeCK93U8");
 
     console.log('Compiling Vesting Wallet code...');
     const walletCode = await compile('VestingWallet');
@@ -15,7 +16,7 @@ export async function run(provider: NetworkProvider) {
       VestingMaster.createFromConfig({
         owner_address: provider.sender().address!,
         vesting_wallet_code: walletCode,
-        logger_address: loggerAddress,
+        logger_address: Address.parse(LOGGER_CONTRACT_ADDRESS),
         total_wallets_created: 0,
         total_royalty_collected: 0n
       },
