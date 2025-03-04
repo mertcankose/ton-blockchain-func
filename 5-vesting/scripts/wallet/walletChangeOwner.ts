@@ -9,25 +9,23 @@ export async function run(provider: NetworkProvider) {
     const walletAddress = Address.parse(WALLET_CONTRACT_ADDRESS);
     const vestingWallet = provider.open(VestingWallet.createFromAddress(walletAddress));
     
-    let jettonWalletAddress = Address.parse("EQBdrXrlWC9d8OmySn41pi17kp0QoWTMJQl6YcT1DDuqDyZj");
+    let newOwnerAddress = Address.parse("0QA_aYew2jqj8gNdkeg-KDw8YB8ovTkKNNj02aMwpAZxNwP5");
     
-    const forwardTonAmount = toNano('0.5');
-    const result = await vestingWallet.cancelVesting(
+    await vestingWallet.updateOwner(
       provider.provider(walletAddress),
       provider.sender(),
       {
-        forwardTonAmount,
-        jettonWalletAddress
+        newOwnerAddress: newOwnerAddress
       }
     );
     
-    console.log('Cancel transaction sent successfully!');
+    console.log('Change owner transaction sent successfully!');
     
     return {
       success: true,
     };
   } catch (error) {
-    console.error('Error canceling vesting:', error);
+    console.error('Error changing owner:', error);
     throw error;
   }
 }

@@ -82,6 +82,7 @@ export class VestingMaster implements Contract {
       cancelContractPermission: number;
       changeRecipientPermission: number;
       forwardRemainingBalance: bigint;
+      loggerAddress: Address;
     }
   ) {
     const queryId = 1n;
@@ -103,6 +104,7 @@ export class VestingMaster implements Contract {
       .storeUint(opts.cancelContractPermission, 3)
       .storeUint(opts.changeRecipientPermission, 3)
       .storeCoins(opts.forwardRemainingBalance)
+      .storeAddress(opts.loggerAddress)
       .endCell();
     
     const msgBody = mainCell.storeRef(refCell).endCell();

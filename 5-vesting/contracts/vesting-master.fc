@@ -93,7 +93,7 @@ slice calculate_vesting_wallet_address(cell state_init) inline {
 
 cell create_vesting_wallet_state_init(slice owner_address, slice recipient_address, slice jetton_master_address, 
     int vesting_total_amount, int vesting_params, int is_auto_claim, 
-    int cancel_permission, int change_recipient_permission, cell wallet_code) inline {
+    int cancel_permission, int change_recipient_permission, cell wallet_code, slice logger_address) inline {
 
     ;; Create data cell structure for vesting wallet
     ;; First cell has owner_address only
@@ -116,10 +116,11 @@ cell create_vesting_wallet_state_init(slice owner_address, slice recipient_addre
         .store_uint(change_recipient_permission, 3)
         .end_cell();
     
-    ;; Fourth cell for claimed amount and seqno
+    ;; Fourth cell for claimed amount, seqno and logger address
     cell data4 = begin_cell()
         .store_coins(0) ;; Initial claimed amount
         .store_uint(0, 32) ;; Initial seqno
+        .store_slice(logger_address)
         .end_cell();
     
     ;; Combine all data cells
@@ -182,6 +183,7 @@ cell create_vesting_wallet_state_init(slice owner_address, slice recipient_addre
         int cancel_contract_permission = in_msg_body~load_uint(3);
         int change_recipient_permission = in_msg_body~load_uint(3);
         int forward_remaining_balance = in_msg_body~load_coins();
+        slice logger_address = in_msg_body~load_msg_addr();
 
         throw_unless(39, vesting_start_time > 0);
         throw_unless(40, vesting_total_duration > 0);
@@ -205,7 +207,8 @@ cell create_vesting_wallet_state_init(slice owner_address, slice recipient_addre
             is_auto_claim,
             cancel_contract_permission,
             change_recipient_permission,
-            vesting_wallet_code
+            vesting_wallet_code,
+            logger_address
         );
         
         ;; Calculate the address of the new vesting wallet
@@ -338,7 +341,7 @@ slice get_wallet_address(slice owner_address, slice recipient_address, slice jet
     int unlock_period, int cliff_duration, int is_auto_claim, 
     int cancel_contract_permission, int change_recipient_permission) method_id {
     
-    var (_, vesting_wallet_code, _, _, _) = load_data();
+    var (_, vesting_wallet_code, logger_address, _, _) = load_data();
     
     ;; Check if wallet code is available
     if (cell_null?(vesting_wallet_code)) {
@@ -361,7 +364,8 @@ slice get_wallet_address(slice owner_address, slice recipient_address, slice jet
         is_auto_claim,
         cancel_contract_permission,
         change_recipient_permission,
-        vesting_wallet_code
+        vesting_wallet_code,
+        logger_address
     );
     
     ;; Calculate the address of the vesting wallet

@@ -10,6 +10,8 @@ import {
   toNano,
 } from "@ton/core";
 
+const LOGGER_CONTRACT_ADDRESS = "EQDWQP-8NkhyAvsu6opiulNxuLqX3hKHWMxGyNiQEwi35-ak";
+
 // Default parameters for vesting
 export const DEFAULT_VESTING_PARAMS = {
   // Default values in seconds
@@ -29,6 +31,7 @@ export const VestingWalletOpcodes = {
   claim_unlocked: 0x8888,
   cancel_vesting: 0x9999,
   change_recipient: 0xaaaa,
+  update_owner: 0xd3d3d3d3,
 } as const;
 
 export type VestingWalletConfig = {
@@ -45,6 +48,7 @@ export type VestingWalletConfig = {
   change_recipient_permission: number;
   claimed_amount: bigint;
   seqno: number;
+  logger_address: Address;
 };
 
 export function packVestingParams(
@@ -96,6 +100,7 @@ export function vestingWalletConfigToCell(config: VestingWalletConfig): Cell {
   const cell4 = beginCell()
     .storeCoins(config.claimed_amount)
     .storeUint(config.seqno, 32)
+    .storeAddress(config.logger_address)
     .endCell();
   
   // Ana hücre, dört referansı içeriyor
@@ -181,6 +186,7 @@ export class VestingWallet implements Contract {
       change_recipient_permission: changeRecipientPermission,
       claimed_amount: 0n,
       seqno: 0,
+      logger_address: Address.parse(LOGGER_CONTRACT_ADDRESS)
     };
 
     return VestingWallet.createFromConfig(config, code);
@@ -233,7 +239,7 @@ export class VestingWallet implements Contract {
     const queryId = 2n;
 
     return await provider.internal(via, {
-      value: toNano("0.5"),
+      value: toNano("0.2"),
       sendMode: SendMode.PAY_GAS_SEPARATELY,
       body: beginCell()
         .storeUint(VestingWalletOpcodes.claim_unlocked, 32)
@@ -333,6 +339,27 @@ export class VestingWallet implements Contract {
     };
   }
 
+  // updateOwner
+  async updateOwner(
+    provider: ContractProvider,
+    via: Sender,
+    opts: {
+      newOwnerAddress: Address;
+    }
+  ) {
+    const queryId = 6n;
+
+    return await provider.internal(via, {
+      value: toNano("0.05"),
+      sendMode: SendMode.PAY_GAS_SEPARATELY,
+      body: beginCell()
+        .storeUint(VestingWalletOpcodes.update_owner, 32)
+        .storeUint(queryId, 64)
+        .storeAddress(opts.newOwnerAddress)
+        .endCell(),
+    });
+  }
+
   // Get owner address
   async getOwner(provider: ContractProvider) {
     const result = await provider.get("get_owner", []);
@@ -426,5 +453,10 @@ export class VestingWallet implements Contract {
   async getSeqno(provider: ContractProvider) {
     const result = await provider.get("get_seqno", []);
     return result.stack.readNumber();
+  }
+
+  async getLoggerAddress(provider: ContractProvider) {
+    const result = await provider.get("get_logger_address", []);
+    return result.stack.readAddress();
   }
 }

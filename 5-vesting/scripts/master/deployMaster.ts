@@ -2,12 +2,10 @@ import { toNano, fromNano, Address } from '@ton/core';
 import { VestingMaster } from '../../wrappers/VestingMaster';
 import { compile, NetworkProvider } from '@ton/blueprint';
 
-const LOGGER_CONTRACT_ADDRESS = "EQDWQP-8NkhyAvsu6opiulNxuLqX3hKHWMxGyNiQEwi35-ak";
+const LOGGER_CONTRACT_ADDRESS = "EQDwtJ3ddneadY69XbHSz02DWAsbB7Hyziiyegn1arlEEuOu";
 
 export async function run(provider: NetworkProvider) {
   try {
-    // Logger adresi (varsa)
-
     console.log('Compiling Vesting Wallet code...');
     const walletCode = await compile('VestingWallet');
     

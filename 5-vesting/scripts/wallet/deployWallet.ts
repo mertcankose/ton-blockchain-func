@@ -1,17 +1,15 @@
-// scripts/deploy-wallet.ts
 import { toNano, Address, fromNano } from '@ton/core';
 import { VestingWallet } from '../../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 import { compile } from '@ton/blueprint';
 
 const JETTON_MASTER_ADDRESS = "EQA-EpakmTO_KBPX_NrSY88qS7vqdWKChc-VMtFK0CnSPUwr";
+const LOGGER_CONTRACT_ADDRESS = "EQDwtJ3ddneadY69XbHSz02DWAsbB7Hyziiyegn1arlEEuOu";
 
-// Format date for nice display
 function formatDate(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleString();
 }
 
-// Format duration in seconds
 function formatDuration(seconds: number): string {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
@@ -27,9 +25,7 @@ function formatDuration(seconds: number): string {
 
 export async function run(provider: NetworkProvider) {
     try {
-        // User who is deploying will be the owner
         const ownerAddress = provider.sender().address!;
-        // Recipient address (same as owner in this case)
         const recipientAddress = ownerAddress;
         
         const VESTING_AMOUNT = toNano("100"); // 100 tokens initial vesting amount
@@ -65,7 +61,8 @@ export async function run(provider: NetworkProvider) {
             cancel_contract_permission: CANCEL_CONTRACT_PERMISSION,
             change_recipient_permission: CHANGE_RECIPIENT_PERMISSION,
             claimed_amount: 0n,
-            seqno: 0
+            seqno: 0,
+            logger_address: Address.parse(LOGGER_CONTRACT_ADDRESS)
         };
         
         // Create wallet instance with our config

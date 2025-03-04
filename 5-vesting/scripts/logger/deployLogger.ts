@@ -1,4 +1,4 @@
-import { toNano, fromNano, Address } from "@ton/core";
+import { toNano } from "@ton/core";
 import { compile, NetworkProvider } from "@ton/blueprint";
 import { VestingLogger } from "../../wrappers/VestingLogger";
 

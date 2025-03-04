@@ -2,14 +2,12 @@ import { Address, fromNano } from '@ton/core';
 import { VestingWallet } from '../../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 
-const WALLET_CONTRACT_ADDRESS = "EQDV_UbrNEBIS45vS5BJd2Ne6fJeLWwKl7Fn4xtXu5fJOEQ5";
+const WALLET_CONTRACT_ADDRESS = "EQBJ7lGxxA2Usi1yEv3t_0ZbDQA1nuWmOpyT_K0S8WVJzrYi";
 
-// Tarih formatı
 function formatDate(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleString();
 }
 
-// İlerleme çubuğu oluştur
 function createProgressBar(percent: number, length: number = 30): string {
   const filledLength = Math.round(length * (percent / 100));
   const emptyLength = length - filledLength;
@@ -24,11 +22,9 @@ export async function run(provider: NetworkProvider) {
   try {
     console.log('Checking unlocked tokens status...');
     
-    // VestingWallet kontratını aç
     const walletAddress = Address.parse(WALLET_CONTRACT_ADDRESS);
     const vestingWallet = provider.open(VestingWallet.createFromAddress(walletAddress));
     
-    // Vesting bilgilerini al
     const vestingData = await vestingWallet.getVestingData();
     const currentUnlocked = await vestingWallet.getCurrentUnlockedAmount();
     const currentLocked = await vestingWallet.getCurrentLockedAmount();

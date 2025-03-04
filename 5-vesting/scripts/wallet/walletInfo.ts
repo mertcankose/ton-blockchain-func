@@ -1,16 +1,13 @@
-// scripts/wallet-info.ts
 import { Address, fromNano } from '@ton/core';
 import { VestingWallet } from '../../wrappers/VestingWallet';
 import { NetworkProvider } from '@ton/blueprint';
 
-const WALLET_CONTRACT_ADDRESS = "EQDV_UbrNEBIS45vS5BJd2Ne6fJeLWwKl7Fn4xtXu5fJOEQ5";
+const WALLET_CONTRACT_ADDRESS = "EQBJ7lGxxA2Usi1yEv3t_0ZbDQA1nuWmOpyT_K0S8WVJzrYi";
 
-// Tarih formatı
 function formatDate(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleString();
 }
 
-// Süre formatı
 function formatDuration(seconds: number): string {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
@@ -58,6 +55,7 @@ export async function run(provider: NetworkProvider) {
     const claimedAmount = await vestingWallet.getClaimedAmount();
     const claimableAmount = await vestingWallet.getClaimableAmount();
     const seqno = await vestingWallet.getSeqno();
+    const loggerAddress = await vestingWallet.getLoggerAddress();
     
     console.log('\n===== VESTING WALLET INFORMATION =====');
     console.log('Wallet Address:', walletAddress.toString());
@@ -65,6 +63,7 @@ export async function run(provider: NetworkProvider) {
     console.log('Recipient Address:', recipient.toString());
     console.log('Jetton Master:', vestingData.jettonMasterAddress.toString());
     console.log('Current Seqno:', seqno);
+    console.log('Logger Address:', loggerAddress.toString());
     
     console.log('\n--- Vesting Schedule ---');
     console.log('Start Time:', formatDate(vestingData.vestingStartTime));
