@@ -2,7 +2,7 @@ import { Address, toNano, fromNano } from "@ton/core";
 import { VestingMaster } from "../../wrappers/VestingMaster";
 import { NetworkProvider } from "@ton/blueprint";
 
-const MASTER_CONTRACT_ADDRESS = "EQDuKU3ALvqSInYb5B4TwYTro2-5o2-P-P3UrXwGmD11IhrB";
+const MASTER_CONTRACT_ADDRESS = "EQAyY04FSdksnoK8Q38ZgYQPvkMRcSMjgQGCRAhXqVqq1hHY";
 const JETTON_MASTER_ADDRESS = "kQBQCVW3qnGKeBcumkLVD6x_K2nehE6xC5VsCyJZ02wvUBJy";
 
 const CUSTOM_PARAMS = {
@@ -21,7 +21,6 @@ function formatDuration(seconds: number): string {
   return days > 0 ? `${days} days` : `${seconds} seconds`;
 }
 
-// Permission tanımını açıklama
 function getPermissionDescription(permissionType: number): string {
   switch(permissionType) {
     case 1: return "Only Recipient";
@@ -36,17 +35,13 @@ export async function run(provider: NetworkProvider) {
   try {
     console.log("Creating new Vesting Wallet with custom parameters...");
 
-    // VestingMaster kontratını aç
     const masterAddress = Address.parse(MASTER_CONTRACT_ADDRESS);
     const vestingMaster = provider.open(
       VestingMaster.createFromAddress(masterAddress)
     );
 
     const jettonMaster = Address.parse(JETTON_MASTER_ADDRESS);
-
     const royaltyFee = await vestingMaster.getRoyaltyFee();
-
-    console.log("Royalty fee:", fromNano(royaltyFee), "TON");
 
     const now = Math.floor(Date.now() / 1000);
     const vestingTotalAmount = toNano("100");
@@ -57,7 +52,6 @@ export async function run(provider: NetworkProvider) {
     const isAutoClaim = 1; // 0 = no auto claim, 1 = auto claim
     const cancelContractPermission = 2; // 1 = only_recipient, 2 = only_owner, 3 = both, 4 = neither
     const changeRecipientPermission = 2; // 1 = only_recipient, 2 = only_owner, 3 = both, 4 = neither
-
     const ownerAddress = provider.sender().address!;
     const recipientAddress = provider.sender().address!;
 
@@ -96,11 +90,10 @@ export async function run(provider: NetworkProvider) {
     );
     console.log("Sending transaction...");
     
-    const result = await vestingMaster.sendCreateVestingWallet(
+    await vestingMaster.sendCreateVestingWallet(
       provider.sender(),
       {
-        value: royaltyFee + toNano("0.1"), // Royalty + gas
-        queryId: 1n,
+        value: royaltyFee + toNano("0.1"),
         owner: ownerAddress,
         recipient: recipientAddress,
         jettonMaster: jettonMaster,
@@ -112,7 +105,7 @@ export async function run(provider: NetworkProvider) {
         isAutoClaim: isAutoClaim,
         cancelContractPermission: cancelContractPermission,
         changeRecipientPermission: changeRecipientPermission,
-        forwardRemainingBalance: toNano("0.1"), // Forward remaining balance to the vesting wallet
+        forwardRemainingBalance: toNano("0.1"),
       }
     );
 

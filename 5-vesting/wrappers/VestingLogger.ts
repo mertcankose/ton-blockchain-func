@@ -13,8 +13,6 @@ import {
 export const VestingLoggerOpcodes = {
   register_wallet: 0xd1d1d1d1,
   update_recipient: 0xd2d2d2d2,
-  log_claim: 0xd3d3d3d3,
-  log_cancel: 0xd4d4d4d4,
 } as const;
 
 export type VestingLoggerConfig = {
@@ -22,8 +20,6 @@ export type VestingLoggerConfig = {
 };
 
 export function vestingLoggerConfigToCell(config: VestingLoggerConfig): Cell {
-  // Simplified data structure - just store the owner address
-  // The contract will initialize empty dictionaries
   return beginCell().storeAddress(config.owner_address).endCell();
 }
 
@@ -131,7 +127,7 @@ export class VestingLogger implements Contract {
       return result.stack.readCell();
     } catch (error) {
       console.error("Error in getOwnerWallets:", error);
-      return beginCell().endCell(); // Return empty cell on error
+      return beginCell().endCell();
     }
   }
 
@@ -150,7 +146,7 @@ export class VestingLogger implements Contract {
       return result.stack.readCell();
     } catch (error) {
       console.error("Error in getReceiverWallets:", error);
-      return beginCell().endCell(); // Return empty cell on error
+      return beginCell().endCell();
     }
   }
 
@@ -161,7 +157,7 @@ export class VestingLogger implements Contract {
       return result.stack.readCell();
     } catch (error) {
       console.error("Error in getAutoClaimWallets:", error);
-      return beginCell().endCell(); // Return empty cell on error
+      return beginCell().endCell();
     }
   }
 
@@ -172,7 +168,7 @@ export class VestingLogger implements Contract {
       return result.stack.readAddress();
     } catch (error) {
       console.error("Error in getOwner:", error);
-      throw error; // Re-throw since we can't return a default address
+      throw error;
     }
   }
 }

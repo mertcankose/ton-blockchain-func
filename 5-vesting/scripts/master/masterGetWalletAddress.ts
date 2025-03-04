@@ -2,7 +2,7 @@ import { Address, toNano, fromNano } from "@ton/core";
 import { VestingMaster } from "../../wrappers/VestingMaster";
 import { NetworkProvider } from "@ton/blueprint";
 
-const MASTER_CONTRACT_ADDRESS = "EQDuKU3ALvqSInYb5B4TwYTro2-5o2-P-P3UrXwGmD11IhrB";
+const MASTER_CONTRACT_ADDRESS = "EQAyY04FSdksnoK8Q38ZgYQPvkMRcSMjgQGCRAhXqVqq1hHY";
 const JETTON_MASTER_ADDRESS = "kQBQCVW3qnGKeBcumkLVD6x_K2nehE6xC5VsCyJZ02wvUBJy";
 
 const CUSTOM_PARAMS = {

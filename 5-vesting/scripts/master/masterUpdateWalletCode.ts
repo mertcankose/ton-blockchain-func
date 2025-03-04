@@ -2,8 +2,7 @@ import { Address } from '@ton/core';
 import { VestingMaster } from '../../wrappers/VestingMaster';
 import { compile, NetworkProvider } from '@ton/blueprint';
 
-const MASTER_CONTRACT_ADDRESS = "EQDuKU3ALvqSInYb5B4TwYTro2-5o2-P-P3UrXwGmD11IhrB";
-
+const MASTER_CONTRACT_ADDRESS = "EQAyY04FSdksnoK8Q38ZgYQPvkMRcSMjgQGCRAhXqVqq1hHY";
 
 const NEW_WALLET_CODE_PATH = "VestingWallet"; 
 

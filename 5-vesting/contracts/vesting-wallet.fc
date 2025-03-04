@@ -4,12 +4,9 @@
 
 ;; Jetton Standard Operations (TEP-74)
 const int op::transfer = 0xf8a7ea5;
-const int op::transfer_notification = 0x7362d09c;
-const int op::excesses = 0xd53276db;
 
 ;; Vesting Wallet Operations
 const int op::send_jettons = 0x7777;
-const int op::report_status = 0x7FEE;
 const int op::claim_unlocked = 0x8888;
 const int op::cancel_vesting = 0x9999;
 const int op::change_recipient = 0xaaaa;
@@ -365,6 +362,7 @@ int calculate_locked_amount(int vesting_total_amount, int vesting_start_time, in
         ;; Load new recipient address
         slice new_recipient_address = in_msg_body~load_msg_addr();
         
+        
         ;; Update recipient
         save_data(owner_address, new_recipient_address, jetton_master_address, vesting_total_amount,
             vesting_start_time, vesting_total_duration, unlock_period, cliff_duration, 
@@ -452,10 +450,6 @@ int calculate_locked_amount(int vesting_total_amount, int vesting_start_time, in
         
         send_raw_message(msg.end_cell(), send_mode::pay_gas_separately);
         return ();
-    }
-
-    if (op == op::excesses) {
-        return (); ;; Ignore excesses notifications
     }
   
     ;; Unknown operation

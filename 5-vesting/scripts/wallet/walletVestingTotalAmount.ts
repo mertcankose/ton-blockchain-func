@@ -2,11 +2,10 @@ import { Address, fromNano } from "@ton/core";
 import { VestingWallet } from "../../wrappers/VestingWallet";
 import { NetworkProvider } from "@ton/blueprint";
 
-const WALLET_ADDRESS = "EQB9HKUKa9iRzn6-NtmqbYYkJgxVangaQPDpWUtR3CTBbij-";
-
+const WALLET_CONTRACT_ADDRESS = "EQDV_UbrNEBIS45vS5BJd2Ne6fJeLWwKl7Fn4xtXu5fJOEQ5";
 
 export async function run(provider: NetworkProvider) {
-  const walletAddress = Address.parse(WALLET_ADDRESS);
+  const walletAddress = Address.parse(WALLET_CONTRACT_ADDRESS);
   const vestingWallet = provider.open(
     VestingWallet.createFromAddress(walletAddress)
   );

@@ -25,10 +25,7 @@ export const DEFAULT_JETTON_MASTER =
   "kQBQCVW3qnGKeBcumkLVD6x_K2nehE6xC5VsCyJZ02wvUBJy";
 
 export const VestingWalletOpcodes = {
-  transfer_notification: 0x7362d09c,
-  excesses: 0xd53276db,
   send_jettons: 0x7777,
-  report_status: 0x7fee,
   claim_unlocked: 0x8888,
   cancel_vesting: 0x9999,
   change_recipient: 0xaaaa,
@@ -207,7 +204,7 @@ export class VestingWallet implements Contract {
       jettonWalletAddress: Address;
     }
   ) {
-    const queryId = 2n;
+    const queryId = 1n;
     const value = opts.forwardTonAmount + toNano("0.05");
 
     return await provider.internal(via, {
@@ -224,6 +221,7 @@ export class VestingWallet implements Contract {
     });
   }
 
+  // claimUnlocked
   async claimUnlocked(
     provider: ContractProvider,
     via: Sender,
@@ -232,12 +230,10 @@ export class VestingWallet implements Contract {
       jettonWalletAddress: Address;
     }
   ) {
-    const queryId = 1n;
-
-    const value = opts.forwardTonAmount + toNano("0.05");
+    const queryId = 2n;
 
     return await provider.internal(via, {
-      value,
+      value: toNano("0.5"),
       sendMode: SendMode.PAY_GAS_SEPARATELY,
       body: beginCell()
         .storeUint(VestingWalletOpcodes.claim_unlocked, 32)
@@ -258,7 +254,7 @@ export class VestingWallet implements Contract {
       jettonWalletAddress: Address;
     }
   ) {
-    const queryId = 1n;
+    const queryId = 3n;
 
     return await provider.external(
       beginCell()
@@ -281,7 +277,7 @@ export class VestingWallet implements Contract {
       jettonWalletAddress: Address;
     }
   ) {
-    const queryId = BigInt(Math.floor(Math.random() * 10000000000))
+    const queryId = 4n;
 
     return await provider.internal(via, {
       value: toNano("0.5"),
@@ -303,7 +299,7 @@ export class VestingWallet implements Contract {
       newRecipientAddress: Address;
     }
   ) {
-    const queryId = BigInt(Math.floor(Math.random() * 10000000000))
+    const queryId = 5n;
 
     return await provider.internal(via, {
       value: toNano("0.05"),
@@ -349,11 +345,13 @@ export class VestingWallet implements Contract {
     return result.stack.readAddress();
   }
 
+  // getCancelContractPermission
   async getCancelContractPermission(provider: ContractProvider) {
     const result = await provider.get("get_cancel_contract_permission", []);
     return result.stack.readNumber();
   }
 
+  // getChangeRecipientPermission
   async getChangeRecipientPermission(provider: ContractProvider) {
     const result = await provider.get("get_change_recipient_permission", []);
     return result.stack.readNumber();

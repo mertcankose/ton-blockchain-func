@@ -4,8 +4,7 @@
 ;; Operations
 const int op::register_wallet = 0xd1d1d1d1;
 const int op::update_recipient = 0xd2d2d2d2;
-const int op::log_claim = 0xd3d3d3d3;
-const int op::log_cancel = 0xd4d4d4d4;
+const int op::update_owner = 0xd3d3d3d3;
 const int op::set_logger_address = 0x4567;
 
 ;; Error codes
@@ -255,24 +254,26 @@ cell add_to_index(cell index_dict, slice key_address, slice wallet_address) inli
         save_data();
         return ();
     }
-    
-    if (op == op::log_claim) {
-        ;; Log a claim event (optional, can be extended with more details)
+
+    if (op == op::update_owner) {
+        ;; Update owner for an existing wallet
         slice wallet_address = in_msg_body~load_msg_addr();
-        int claimed_amount = in_msg_body~load_coins();
+        slice new_owner = in_msg_body~load_msg_addr();
         
-        ;; Here we could store claim history if needed
-        ;; For now, just accept the log message
-        return ();
-    }
-    
-    if (op == op::log_cancel) {
-        ;; Log a contract cancellation
-        slice wallet_address = in_msg_body~load_msg_addr();
+        ;; Update owner for the wallet
+        (int wc, int addr_hash) = parse_std_addr(wallet_address);
+        (slice owner_list_slice, int owner_found) = storage::owner_wallets.udict_get?(267, addr_hash);
         
-        ;; Here we could implement logic to remove the wallet from all indexes,
-        ;; or mark it as canceled. For simplicity, we'll keep it in the logs
-        ;; but could be extended as needed.
+        if (owner_found) {
+            cell owner_dict = owner_list_slice.preload_ref();
+            (_, int was_found) = owner_dict.udict_delete?(267, wc);
+            
+            ;; Add new owner to the owner list
+            storage::owner_wallets = add_to_index(storage::owner_wallets, new_owner, wallet_address);
+            
+            ;; Save updated data
+            save_data();
+        }
         return ();
     }
 }
@@ -346,12 +347,6 @@ cell get_auto_claim_wallets() method_id {
 
 ;; Get logger owner
 slice get_owner() method_id {
-    load_data();
-    return storage::owner;
-}
-
-;; Get logger owner
-slice get_owner2() method_id {
     load_data();
     return storage::owner;
 }

@@ -1,16 +1,18 @@
 import { Address, beginCell, TonClient } from '@ton/ton';
 import { NetworkProvider } from '@ton/blueprint';
-import { API_KEY, CONTRACT_ADDRESS, JETTON_MASTER_ADDRESS } from '../../key';
+
+const API_KEY = "006dccec833d6e1193c45e9c5eaa839f2170f2e780efb2af74cfb05a6261e99d";
+const JETTON_MASTER_ADDRESS = "kQBQCVW3qnGKeBcumkLVD6x_K2nehE6xC5VsCyJZ02wvUBJy";
+const WALLET_CONTRACT_ADDRESS = "EQDV_UbrNEBIS45vS5BJd2Ne6fJeLWwKl7Fn4xtXu5fJOEQ5";
 
 export async function run(provider: NetworkProvider) {
-    const jettonMasterAddress = JETTON_MASTER_ADDRESS;
     const client = new TonClient({ endpoint: 'https://testnet.toncenter.com/api/v2/jsonRPC', apiKey: API_KEY });
 
     try {
-        const userAddressCell = beginCell().storeAddress(Address.parse("EQB9HKUKa9iRzn6-NtmqbYYkJgxVangaQPDpWUtR3CTBbij-")).endCell();
+        const contractAddressCell = beginCell().storeAddress(Address.parse(WALLET_CONTRACT_ADDRESS)).endCell();
 
-        const response = await client.runMethod(Address.parse(jettonMasterAddress), 'get_wallet_address', [
-            { type: 'slice', cell: userAddressCell },
+        const response = await client.runMethod(Address.parse(JETTON_MASTER_ADDRESS), 'get_wallet_address', [
+            { type: 'slice', cell: contractAddressCell },
         ]);
 
         const newJettonWalletAddress = response.stack.readAddress();

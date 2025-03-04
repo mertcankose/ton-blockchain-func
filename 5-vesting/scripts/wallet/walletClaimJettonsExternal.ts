@@ -24,9 +24,9 @@ export async function run(provider: NetworkProvider) {
     let jettonWalletAddress = Address.parse(WALLET_JETTON_ADDRESS);
     
     const forwardTonAmount = toNano('0.5');
-    await vestingWallet.claimUnlocked(
-      provider.provider(walletAddress),
-      provider.sender(),
+    await vestingWallet.sendClaimUnlockedExternal(
+        0,
+        1741271008,
       {
         forwardTonAmount,
         jettonWalletAddress
@@ -34,17 +34,6 @@ export async function run(provider: NetworkProvider) {
     );
     
     console.log('Claim transaction sent successfully!');
-    console.log(`Claimed amount: ${fromNano(claimableAmount)} tokens`);
-    
-    // Remaining claim kontrolü
-    try {
-      const remainingClaimable = await vestingWallet.getClaimableAmount();
-      if (remainingClaimable > 0n) {
-        console.log(`\nNote: There are still ${fromNano(remainingClaimable)} tokens available to claim.`);
-      }
-    } catch (e) {
-      // Ignore error
-    }
     
     return {
       success: true,

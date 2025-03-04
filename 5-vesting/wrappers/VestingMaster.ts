@@ -12,13 +12,10 @@ import {
 
 export const VestingMasterOpcodes = {
   create_vesting_wallet: 0x5fe9b8cd,
-  provide_wallet_address: 0x2c76b973,
-  take_wallet_address: 0xd1735400,
-  collect_royalty: 0xd374ab1c,
   update_wallet_code: 0x1234,
   change_owner: 0x2345,
   withdraw_tons: 0x3456,
-  set_logger_address: 0x4567, // Eklenen opcode
+  set_logger_address: 0x4567,
 } as const;
 
 export type VestingMasterConfig = {
@@ -30,7 +27,6 @@ export type VestingMasterConfig = {
 };
 
 export function vestingMasterConfigToCell(config: VestingMasterConfig): Cell {
-  // Yeni hücre yapısı: owner_address + ref[vesting_wallet_code + diğer veriler]
   const extraData = beginCell()
     .storeRef(config.vesting_wallet_code)
     .storeAddress(config.logger_address)
@@ -68,12 +64,12 @@ export class VestingMaster implements Contract {
     });
   }
 
+  // Create vesting wallet
   async sendCreateVestingWallet(
     provider: ContractProvider,
     via: Sender,
     opts: {
       value: bigint;
-      queryId: bigint;
       owner: Address;
       recipient: Address;
       jettonMaster: Address;
@@ -88,9 +84,11 @@ export class VestingMaster implements Contract {
       forwardRemainingBalance: bigint;
     }
   ) {
+    const queryId = 1n;
+
     const mainCell = beginCell()
       .storeUint(VestingMasterOpcodes.create_vesting_wallet, 32)
-      .storeUint(opts.queryId, 64)
+      .storeUint(queryId, 64)
       .storeAddress(opts.owner)
       .storeAddress(opts.recipient)
       .storeAddress(opts.jettonMaster)
@@ -116,57 +114,13 @@ export class VestingMaster implements Contract {
     });
   }
 
-  async sendProvideWalletAddress(
-    provider: ContractProvider,
-    via: Sender,
-    opts: {
-      owner: Address;
-      recipient: Address;
-      jettonMaster: Address;
-      vestingTotalAmount: bigint;
-      includeStateInit: boolean;
-      startTime: number;
-      totalDuration: number;
-      unlockPeriod: number;
-      cliffDuration: number;
-      isAutoClaim: number;
-      cancelContractPermission: number;
-      changeRecipientPermission: number;
-    }
-  ) {
-    const queryId = BigInt(Math.floor(Math.random() * 10000000000));
-  
-    const msgBody = beginCell()
-      .storeUint(VestingMasterOpcodes.provide_wallet_address, 32)
-      .storeUint(queryId, 64)
-      .storeAddress(opts.owner)
-      .storeAddress(opts.recipient)
-      .storeAddress(opts.jettonMaster)
-      .storeCoins(opts.vestingTotalAmount)
-      .storeBit(opts.includeStateInit)
-      .storeUint(opts.startTime, 32)
-      .storeUint(opts.totalDuration, 32)
-      .storeUint(opts.unlockPeriod, 32)
-      .storeUint(opts.cliffDuration, 32)
-      .storeUint(opts.isAutoClaim, 1)
-      .storeUint(opts.cancelContractPermission, 3)
-      .storeUint(opts.changeRecipientPermission, 3)
-      .endCell()
-  
-    return await provider.internal(via, {
-      value: toNano("0.05"),
-      sendMode: SendMode.PAY_GAS_SEPARATELY,
-      body: msgBody
-    });
-  }
-
-  // Logger adresini güncelle
+  // Set logger address
   async sendSetLoggerAddress(
     provider: ContractProvider,
     via: Sender,
     newLoggerAddress: Address
   ) {
-    const queryId = BigInt(Math.floor(Math.random() * 10000000000));
+    const queryId = 2n;
 
     return await provider.internal(via, {
       value: toNano("0.05"),
@@ -179,13 +133,13 @@ export class VestingMaster implements Contract {
     });
   }
 
-  // Update wallet code (owner only)
+  // Update wallet code
   async sendUpdateWalletCode(
     provider: ContractProvider,
     via: Sender,
     newCode: Cell
   ) {
-    const queryId = BigInt(Math.floor(Math.random() * 10000000000));
+    const queryId = 3n;
 
     return await provider.internal(via, {
       value: toNano("0.05"),
@@ -198,13 +152,13 @@ export class VestingMaster implements Contract {
     });
   }
 
-  // Change owner (owner only)
+  // Change owner
   async sendChangeOwner(
     provider: ContractProvider,
     via: Sender,
     newOwner: Address
   ) {
-    const queryId = BigInt(Math.floor(Math.random() * 10000000000));
+    const queryId = 4n;
 
     return await provider.internal(via, {
       value: toNano("0.05"),
@@ -217,13 +171,13 @@ export class VestingMaster implements Contract {
     });
   }
 
-  // Withdraw TON (owner only)
+  // Withdraw TON
   async sendWithdrawTons(
     provider: ContractProvider,
     via: Sender,
     amount: bigint
   ) {
-    const queryId = BigInt(Math.floor(Math.random() * 10000000000));
+    const queryId = 5n;
 
     return await provider.internal(via, {
       value: toNano("0.05"),
@@ -269,6 +223,7 @@ export class VestingMaster implements Contract {
     return result.stack.readAddress();
   }
 
+  // Get wallet address
   async getWalletAddress(
     provider: ContractProvider,
     owner: Address,
